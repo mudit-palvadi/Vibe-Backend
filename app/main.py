@@ -14,7 +14,7 @@ from app.routes.song_routes import router as song_router
 async def lifespan(app: FastAPI):
     if settings.DB_BACKEND == "dynamodb":
         print("Dynamodb connected")
-    else:
+    elif engine is not None:
         SQLModel.metadata.create_all(engine)
         print("Database connected")
     yield

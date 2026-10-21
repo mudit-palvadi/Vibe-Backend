@@ -3,15 +3,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str
+    DATABASE_URL: str = ""
     # the old supabase project, only used by the keepalive and the migration scripts
-    SUPABASE_URL: str
-    CLOUDINARY_CLOUD_NAME: str
-    CLOUDINARY_API_KEY: str
-    CLOUDINARY_API_SECRET: str
+    SUPABASE_URL: str = ""
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
 
     # google oauth, the client id is checked against the id token audience
-    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_JWKS_URL: str = "https://www.googleapis.com/oauth2/v3/certs"
     GOOGLE_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
