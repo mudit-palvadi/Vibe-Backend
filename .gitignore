@@ -40,3 +40,6 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+
+# the map of the old media urls, the migration script writes it
+scripts/media_map.json
