@@ -1,10 +1,42 @@
+# env files
 .env
+.env.local
+.env.*.local
 
-#Pycache
-app/__pycache__
-app/auth/__pycache__
-app/core/__pycache__
-app/db/__pycache__
-app/model/__pycache__
-app/routes/__pycache__
-app/schemas/__pycache__
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# virtual envs
+venv/
+.venv/
+env/
+ENV/
+
+# aws
+cdk.out/
+infra/cdk.out/
+.aws-sam/
+*.zip
+*.zip.*
+
+# os
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# editors
+.idea/
+.vscode/
+*.swp
