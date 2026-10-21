@@ -18,8 +18,8 @@ class AddPlaylistSong(BaseModel):
 
 
 class PlaylistResponse(BaseModel):
-    id: UUID
-    user_id: UUID
+    id: str
+    user_id: str
     name: str
     description: str | None = None
     thumbnail_url: str | None = None

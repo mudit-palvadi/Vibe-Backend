@@ -1,5 +1,4 @@
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -7,7 +6,7 @@ from app.schemas.song import SongResponse
 
 
 class UserResponse(BaseModel):
-    id: UUID
+    id: str
     name: str
     email: str
 
@@ -39,14 +38,14 @@ class AuthRefreshResponse(BaseModel):
 class FavouriteResponse(BaseModel):
     id: str
     song_id: str
-    user_id: UUID
+    user_id: str
     song: SongResponse
 
     model_config = {"from_attributes": True}
 
 
 class UserWithFavouritesResponse(BaseModel):
-    id: UUID
+    id: str
     name: str
     email: str
     created_at: datetime
