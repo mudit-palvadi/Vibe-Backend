@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     SESSION_TTL_DAYS: int = 30
     SESSION_ISSUER: str = "vibe-backend"
 
+    # the s3 bucket that holds the song files
+    S3_BUCKET: str = ""
+    S3_REGION: str = "ap-south-1"
+    MEDIA_BASE_URL: str = ""
+    S3_UPLOAD_URL_EXPIRY: int = 900
+
     # only needed by the one off scripts that read the old supabase data
     SUPABASE_SERVICE_ROLE_KEY: str = ""
 
