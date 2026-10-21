@@ -84,7 +84,7 @@ def main() -> None:
     for song in songs:
         media = media_map.get(song["id"], {})
         songs_repository.create(
-            song_id=song["id"],
+            song_id=str(song["id"]),
             song_name=song["song_name"],
             artist=song["artist"],
             song_url=media.get("song_url", song["song_url"]),
@@ -114,7 +114,7 @@ def main() -> None:
     favourites_repository = DynamoDbFavouriteRepository(table)
     for favourite in favourites:
         favourites_repository.toggle(
-            song_id=favourite["song_id"],
+            song_id=str(favourite["song_id"]),
             user_id=str(favourite["user_id"]),
         )
     print(f"moved {len(favourites)} favourites to dynamodb")
