@@ -7,6 +7,9 @@ exclude = ["venv", "infra/cdk.out", "build"]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B", "DTZ"]
 ignore = ["B008"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["vibe_stack"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
