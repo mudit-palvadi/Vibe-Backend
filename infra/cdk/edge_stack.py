@@ -2,6 +2,8 @@ from aws_cdk import CfnOutput, Stack
 from aws_cdk import aws_wafv2 as wafv2
 from constructs import Construct
 
+WEB_ACL_NAME = "vibe-web-acl"
+
 
 class EdgeStack(Stack):
     """the web acl of the app, it has to live in us east 1 because the
@@ -13,7 +15,7 @@ class EdgeStack(Stack):
         self.web_acl = wafv2.CfnWebACL(
             self,
             "WebAcl",
-            name="vibe-web-acl",
+            name=WEB_ACL_NAME,
             scope="CLOUDFRONT",
             default_action=wafv2.CfnWebACL.DefaultActionProperty(
                 allow=wafv2.CfnWebACL.AllowActionProperty()
