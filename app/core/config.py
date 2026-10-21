@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str
+    # the old supabase project, only used by the keepalive and the migration scripts
     SUPABASE_URL: str
     CLOUDINARY_CLOUD_NAME: str
     CLOUDINARY_API_KEY: str
