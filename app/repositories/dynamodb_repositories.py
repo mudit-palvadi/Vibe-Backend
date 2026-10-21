@@ -7,15 +7,16 @@ everything lives in one table, the key of an item says what the item is:
     USERGOOGLE#<google sub>           USER                 where the user with that google id is
     USEREMAIL#<email>                 USER                 where the user with that email is
     SONG#<song id>                    META                 the song
-    SONGNAME#<name>#<song id>         <name>#<song id>     the song in the order of its name
-    SONGARTIST#<artist>#<song id>     <name>#<song id>     the song in the order of its artist
-    SONGTAG#<tag>#<song id>           <name>#<song id>     one item for every tag of the song
+    IDX_NAME                           <name>#<song id>     the song in the order of its name
+    IDX_ARTIST                         <artist>#<song id>   the song in the order of its artist
+    IDX_TAG                            <tag>#<name>#<id>    one item for every tag of the song
     PLAYLIST#<playlist id>            META                 the playlist
-    PLAYLIST#<playlist id>            SONG#<time>#<song>   a song of the playlist
-    USERPLAYLIST#<user id>#<list id>  <time>#<list id>    the playlist in the list of the user
+    PLAYLIST#<playlist id>            SONG#<song id>       a song of the playlist
+    IDX_USER_PLAYLIST#<user id>       <time>#<list id>     the playlist in the list of the user
 
-the search runs on the folder of the index items, the name of the song is in
-the sort key so the songs come back in the alphabetical order
+the search items live in folders with a fixed partition key, so the search
+looks at the start of the sort key and the songs come back in the
+alphabetical order without needing an index
 """
 
 import uuid
@@ -47,6 +48,10 @@ from app.repositories.tags import join_tags, parse_tags
 
 PROFILE = "PROFILE"
 POINTER = "USER"
+NAME_INDEX = "IDX_NAME"
+ARTIST_INDEX = "IDX_ARTIST"
+TAG_INDEX = "IDX_TAG"
+USER_PLAYLIST_INDEX = "IDX_USER_PLAYLIST"
 TRANSACTION_LIMIT = 100
 
 
@@ -97,10 +102,14 @@ class DynamoDbBase:
     def _get(self, pk: str, sk: str) -> dict | None:
         return self.table.get_item(Key={"PK": pk, "SK": sk}).get("Item")
 
-    def _query_prefix(self, prefix: str) -> list[dict]:
-        """every item of the folder that starts with the prefix"""
+    def _query(self, pk: str, sk_prefix: str | None = None) -> list[dict]:
+        """every item of the folder, the sort key can start with something"""
+        request = {"KeyConditionExpression": Key("PK").eq(pk)}
+
+        if sk_prefix is not None:
+            request["KeyConditionExpression"] &= Key("SK").begins_with(sk_prefix)
+
         items = []
-        request = {"KeyConditionExpression": Key("PK").begins_with(prefix)}
         while True:
             response = self.table.query(**request)
             items.extend(response.get("Items", []))
@@ -294,14 +303,14 @@ class DynamoDbSongRepository(DynamoDbBase, SongRepository):
         items = [
             {"PK": f"SONG#{song_id}", "SK": "META", "entity": "song", **details},
             {
-                "PK": f"SONGNAME#{name_key}",
+                "PK": NAME_INDEX,
                 "SK": name_key,
                 "entity": "song_name",
                 **details,
             },
             {
-                "PK": f"SONGARTIST#{artist.lower()}#{song_id}",
-                "SK": name_key,
+                "PK": ARTIST_INDEX,
+                "SK": f"{artist.lower()}#{song_id}",
                 "entity": "song_artist",
                 **details,
             },
@@ -310,8 +319,8 @@ class DynamoDbSongRepository(DynamoDbBase, SongRepository):
         for tag in tag_list:
             items.append(
                 {
-                    "PK": f"SONGTAG#{tag.lower()}#{song_id}",
-                    "SK": name_key,
+                    "PK": TAG_INDEX,
+                    "SK": f"{tag.lower()}#{name_key}",
                     "entity": "song_tag",
                     "tag": tag,
                     **details,
@@ -329,19 +338,19 @@ class DynamoDbSongRepository(DynamoDbBase, SongRepository):
         return _to_song(item)
 
     def list_all(self) -> list[SongRecord]:
-        return [_to_song(item) for item in self._query_prefix("SONGNAME#")]
+        return [_to_song(item) for item in self._query(NAME_INDEX)]
 
     def search(self, query: str) -> list[SongRecord]:
         """the songs that start with the query, in the name, the artist, or a tag"""
         lowered = query.lower()
         found: dict[str, SongRecord] = {}
 
-        for prefix in (
-            f"SONGNAME#{lowered}",
-            f"SONGARTIST#{lowered}",
-            f"SONGTAG#{lowered}",
+        for index, prefix in (
+            (NAME_INDEX, lowered),
+            (ARTIST_INDEX, lowered),
+            (TAG_INDEX, lowered),
         ):
-            for item in self._query_prefix(prefix):
+            for item in self._query(index, prefix):
                 found.setdefault(item["id"], _to_song(item))
 
         return list(found.values())
@@ -359,6 +368,7 @@ class DynamoDbPlaylistRepository(DynamoDbBase, PlaylistRepository):
     ) -> PlaylistRecord:
         playlist_id = playlist_id or str(uuid.uuid4())
         now = _now()
+        index_key = f"{now}#{playlist_id}"
 
         details = _without_empty(
             {
@@ -375,8 +385,8 @@ class DynamoDbPlaylistRepository(DynamoDbBase, PlaylistRepository):
             [
                 {"PK": f"PLAYLIST#{playlist_id}", "SK": "META", "entity": "playlist", **details},
                 {
-                    "PK": f"USERPLAYLIST#{user_id}#{playlist_id}",
-                    "SK": f"{now}#{playlist_id}",
+                    "PK": f"{USER_PLAYLIST_INDEX}#{user_id}",
+                    "SK": index_key,
                     "entity": "user_playlist",
                     **details,
                 },
@@ -399,14 +409,11 @@ class DynamoDbPlaylistRepository(DynamoDbBase, PlaylistRepository):
         return _to_playlist(item)
 
     def list_for_user(self, user_id: str) -> list[PlaylistRecord]:
-        items = self._query_prefix(f"USERPLAYLIST#{user_id}#")
+        items = self._query(f"{USER_PLAYLIST_INDEX}#{user_id}")
         return [_to_playlist(item) for item in items]
 
     def list_songs(self, playlist_id: str) -> list[SongRecord]:
-        items = self.table.query(
-            KeyConditionExpression=Key("PK").eq(f"PLAYLIST#{playlist_id}")
-            & Key("SK").begins_with("SONG#")
-        ).get("Items", [])
+        items = self._query(f"PLAYLIST#{playlist_id}", "SONG#")
 
         items.sort(key=lambda item: item.get("added_at", ""))
 
@@ -450,15 +457,13 @@ class DynamoDbPlaylistRepository(DynamoDbBase, PlaylistRepository):
         if playlist is None:
             return
 
-        songs = self.table.query(
-            KeyConditionExpression=Key("PK").eq(f"PLAYLIST#{playlist_id}")
-            & Key("SK").begins_with("SONG#")
-        ).get("Items", [])
-
         items = [{"PK": f"PLAYLIST#{playlist_id}", "SK": "META"}]
-        items.extend({"PK": f"PLAYLIST#{playlist_id}", "SK": item["SK"]} for item in songs)
+        items.extend(
+            {"PK": f"PLAYLIST#{playlist_id}", "SK": item["SK"]}
+            for item in self._query(f"PLAYLIST#{playlist_id}", "SONG#")
+        )
 
-        for item in self._query_prefix(f"USERPLAYLIST#{playlist.user_id}#"):
+        for item in self._query(f"{USER_PLAYLIST_INDEX}#{playlist.user_id}"):
             if item.get("id") == playlist_id:
                 items.append({"PK": item["PK"], "SK": item["SK"]})
 
@@ -509,14 +514,10 @@ class DynamoDbFavouriteRepository(DynamoDbBase, FavouriteRepository):
         return FavouriteRecord(id=item["id"], song_id=item["song_id"], user_id=item["user_id"])
 
     def list_for_user(self, user_id: str) -> list[FavouriteWithSong]:
-        items = self.table.query(KeyConditionExpression=Key("PK").eq(f"USER#{user_id}")).get(
-            "Items", []
-        )
+        items = self._query(f"USER#{user_id}", "FAV#")
 
         favourites = []
         for item in items:
-            if not item["SK"].startswith("FAV#"):
-                continue
             favourites.append(
                 FavouriteWithSong(
                     id=item["id"],

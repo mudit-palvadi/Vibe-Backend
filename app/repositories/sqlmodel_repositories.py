@@ -1,7 +1,7 @@
 import uuid
 from uuid import UUID
 
-from sqlmodel import Session, or_, select
+from sqlmodel import Session, func, or_, select
 
 from app.models.favourite import Favourite
 from app.models.playlist import Playlist, PlaylistSongLink
@@ -23,13 +23,16 @@ from app.repositories.records import (
 from app.repositories.tags import join_tags, parse_tags
 
 
-def _to_uuid(value: str | UUID) -> UUID | None:
+def _to_uuid(value: str | UUID | None) -> UUID | None:
+    if value is None:
+        return None
+
     if isinstance(value, UUID):
         return value
 
     try:
         return UUID(value)
-    except ValueError:
+    except (ValueError, AttributeError, TypeError):
         return None
 
 
@@ -161,7 +164,7 @@ class SqlModelSongRepository:
         return _song_record(song) if song else None
 
     def list_all(self) -> list[SongRecord]:
-        songs = self.session.exec(select(Song).order_by(Song.song_name)).all()
+        songs = self.session.exec(select(Song).order_by(func.lower(Song.song_name))).all()
         return [_song_record(song) for song in songs]
 
     def search(self, query: str) -> list[SongRecord]:
@@ -169,7 +172,7 @@ class SqlModelSongRepository:
         # dynamodb implementation does it
         patterns = [
             f"{query}%",
-            f"%,{query},%",
+            f"%,{query}%",
             f"%,{query}",
         ]
         conditions = [Song.song_name.ilike(patterns[0]), Song.artist.ilike(patterns[0])]
