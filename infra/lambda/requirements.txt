@@ -1,9 +1,7 @@
 boto3==1.43.116
-cloudinary==1.44.2
 fastapi==0.136.1
 httpx==0.28.1
 mangum==0.22.0
 pydantic-settings==2.14.1
 PyJWT[crypto]==2.12.1
-python-multipart==0.0.28
 sqlmodel==0.0.38
