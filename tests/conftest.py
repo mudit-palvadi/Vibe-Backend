@@ -5,11 +5,12 @@ from uuid import UUID
 # the settings are read at import time, so they have to be set before the app is imported
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
-os.environ.setdefault("CLOUDINARY_CLOUD_NAME", "test-cloud")
-os.environ.setdefault("CLOUDINARY_API_KEY", "test-key")
-os.environ.setdefault("CLOUDINARY_API_SECRET", "test-secret")
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 os.environ.setdefault("SESSION_SECRET", "test-session-secret-that-is-long-enough-123")
+
+# the tests always run on the local database, the .env file of the machine
+# points at dynamodb
+os.environ["DB_BACKEND"] = "sqlmodel"
 
 import pytest
 from fastapi.testclient import TestClient
