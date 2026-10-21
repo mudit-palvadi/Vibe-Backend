@@ -1,6 +1,6 @@
 """moves the users from the old postgres database to dynamodb
 
-run it once with the database url of the old supabase project:
+run it once with the database url of the old postgres database:
     python scripts/migrate_users_to_dynamodb.py
 """
 
@@ -27,9 +27,24 @@ def get_connection():
     return psycopg2.connect(url)
 
 
+def has_google_sub(connection) -> bool:
+    # the column is only there when the supabase script ran before
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select 1 from information_schema.columns "
+            "where table_name = 'users' and column_name = 'google_sub'"
+        )
+        return cursor.fetchone() is not None
+
+
 def get_users(connection) -> list[dict]:
+    query = "select id, name, email from users order by created_at"
+
+    if has_google_sub(connection):
+        query = "select id, name, email, google_sub from users order by created_at"
+
     with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-        cursor.execute("select id, name, email, google_sub from users order by created_at")
+        cursor.execute(query)
         return cursor.fetchall()
 
 

@@ -3,7 +3,7 @@
 the media map file of the copy_media_to_s3 script is used to know the new
 urls of the song files
 
-run it once with the database url of the old supabase project:
+run it once with the database url of the old postgres database:
     python scripts/migrate_content_to_dynamodb.py
 """
 
