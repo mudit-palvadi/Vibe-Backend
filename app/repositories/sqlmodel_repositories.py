@@ -163,9 +163,9 @@ class SqlModelSongRepository:
         conditions = [Song.song_name.ilike(patterns[0]), Song.artist.ilike(patterns[0])]
         conditions.extend(Song.tags.ilike(pattern) for pattern in patterns)
 
-        songs = (
-            self.session.exec(select(Song).where(or_(*conditions)).order_by(Song.song_name)).all()
-        )
+        songs = self.session.exec(
+            select(Song).where(or_(*conditions)).order_by(Song.song_name)
+        ).all()
         return [_song_record(song) for song in songs]
 
 
