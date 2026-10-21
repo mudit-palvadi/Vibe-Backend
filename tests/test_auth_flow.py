@@ -22,7 +22,7 @@ def test_the_login_refresh_and_me_flow(client, session, jwks_server, monkeypatch
     session_token = login.json()["session_token"]
 
     # the client asks for its own data with the session token
-    me = client.get("/auth/", headers={"Authorization": f"Bearer {session_token}"})
+    me = client.get("/auth", headers={"Authorization": f"Bearer {session_token}"})
 
     assert me.status_code == 200
     assert me.json()["email"] == "someone@gmail.com"
@@ -40,7 +40,7 @@ def test_the_login_refresh_and_me_flow(client, session, jwks_server, monkeypatch
     assert new_session_token
 
     # the new session token works as well
-    me = client.get("/auth/", headers={"Authorization": f"Bearer {new_session_token}"})
+    me = client.get("/auth", headers={"Authorization": f"Bearer {new_session_token}"})
 
     assert me.status_code == 200
     assert me.json()["email"] == "someone@gmail.com"

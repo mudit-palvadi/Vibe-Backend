@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.session import verify_session_token
@@ -10,18 +10,28 @@ from app.repositories.records import UserRecord
 
 security = HTTPBearer(auto_error=False)
 
+# cloudfront signs the request it sends to the lambda, so the header of the
+# viewer is not the one that arrives, the token comes in its own header
+SESSION_HEADER = "x-vibe-auth"
+
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     users: UserRepository = Depends(get_user_repository),
 ) -> UserRecord:
-    if not credentials or credentials.scheme != "Bearer":
+    token = request.headers.get(SESSION_HEADER)
+
+    if not token and credentials and credentials.scheme == "Bearer":
+        token = credentials.credentials
+
+    if not token:
         raise HTTPException(
             status_code=401,
             detail="Invalid authorization format or token missing",
         )
 
-    payload = verify_session_token(credentials.credentials)
+    payload = verify_session_token(token)
 
     user_id = payload.get("sub")
     google_sub = payload.get("google_sub")

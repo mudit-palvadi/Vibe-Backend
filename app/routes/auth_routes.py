@@ -78,7 +78,7 @@ def refresh_session(
     }
 
 
-@router.get("/", response_model=UserWithFavouritesResponse)
+@router.get("", response_model=UserWithFavouritesResponse)
 def current_user_data(
     current_user: UserRecord = Depends(get_current_user),
     favourites: FavouriteRepository = Depends(get_favourite_repository),
