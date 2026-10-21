@@ -7,7 +7,11 @@ WEB_ACL_NAME = "vibe-web-acl"
 
 class EdgeStack(Stack):
     """the web acl of the app, it has to live in us east 1 because the
-    cloudfront web acl is a global resource"""
+    cloudfront web acl is a global resource
+
+    this stack is not deployed while the account is on the free plan, a
+    cloudfront web acl costs money every month. it comes back when the
+    account is on the paid plan and the flat rate plan is used"""
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)

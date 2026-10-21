@@ -5,7 +5,6 @@ import aws_cdk as cdk
 import boto3
 from botocore.exceptions import ClientError
 
-from edge_stack import WEB_ACL_NAME, EdgeStack
 from vibe_stack import SESSION_SECRET_PARAMETER, VibeStack
 
 app = cdk.App()
@@ -53,23 +52,6 @@ def read_parameter(name: str) -> str:
         return ""
 
 
-def find_web_acl_arn() -> str:
-    """the web acl of cloudfront is global, so it lives in us east one"""
-    client = boto3.client("wafv2", region_name=EDGE_REGION)
-
-    try:
-        web_acls = client.list_web_acls(Scope="CLOUDFRONT")["WebACLs"]
-    except Exception as e:
-        print(f"the web acl could not be read: {e}")
-        return ""
-
-    for web_acl in web_acls:
-        if web_acl["Name"] == WEB_ACL_NAME:
-            return web_acl["ARN"]
-
-    return ""
-
-
 def find_api_url() -> str:
     """the address of the distribution that is already up, the song links point
     at it"""
@@ -96,13 +78,15 @@ VibeStack(
     media_base_url=app.node.try_get_context("mediaBaseUrl") or find_api_url(),
     google_client_id=app.node.try_get_context("googleClientId")
     or read_parameter(GOOGLE_CLIENT_ID_PARAMETER),
-    waf_acl_arn=app.node.try_get_context("wafAclArn") or find_web_acl_arn(),
 )
 
-EdgeStack(
-    app,
-    "EdgeStack",
-    env=cdk.Environment(account=account, region=EDGE_REGION),
-)
+# the web acl is not deployed while the account is on the free plan, a
+# cloudfront web acl costs about five dollars every month. it comes back when
+# the account is on the paid plan and the flat rate plan is used
+# EdgeStack(
+#     app,
+#     "EdgeStack",
+#     env=cdk.Environment(account=account, region=EDGE_REGION),
+# )
 
 app.synth()

@@ -44,7 +44,6 @@ class VibeStack(Stack):
         construct_id: str,
         media_base_url: str = "",
         google_client_id: str = "",
-        waf_acl_arn: str = "",
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -153,7 +152,6 @@ class VibeStack(Stack):
                 "MEDIA_BASE_URL": media_base_url,
                 "SESSION_SECRET_PARAMETER": SESSION_SECRET_PARAMETER,
                 "GOOGLE_CLIENT_ID": google_client_id,
-                "LEGACY_UPLOAD_ENABLED": "false",
             },
         )
 
@@ -207,7 +205,8 @@ class VibeStack(Stack):
                     cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
                 )
             },
-            web_acl_id=waf_acl_arn or None,
+            # the web acl is not used, the account is on the free plan and a
+            # cloudfront web acl costs money every month
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             http_version=cloudfront.HttpVersion.HTTP2_AND_3,
             comment="the vibe app",
