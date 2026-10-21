@@ -12,9 +12,12 @@ Here is what I am using to build the backend:
 
 - **FastAPI**: The web framework for handling API routes and requests.
 - **SQLModel**: The database toolkit that combines SQLAlchemy and Pydantic so I can write pythonic database models.
-- **PostgreSQL**: The relational database for storing app data.
+- **PostgreSQL**: The relational database of the old setup, the app can still use it.
+- **DynamoDB**: The database the app uses now, everything sits in one table and the key of an item says what the item is.
+- **Repositories**: The routes only talk to the repository interfaces, so the database can be swapped without touching the routes.
 - **PyJWT & PyJWKClient**: To fetch the Google public signature keys and verify the id token of the user, and to sign the session tokens.
-- **Cloudinary**: For storing and serving audio files and song covers.
+- **Amazon S3**: For storing and serving audio files and song covers, the client uploads the files straight to the bucket.
+- **AWS CDK**: The infrastructure of the project, the table, the function, and the files.
 - **Pydantic Settings**: For loading configuration settings from environment files.
 
 ---
@@ -54,6 +57,7 @@ server/
 │   │   └── user.py               # User profile model
 │   ├── repositories/
 │   │   ├── dependencies.py         # Gives the routes the repository they should use
+│   │   ├── dynamodb_repositories.py # The dynamodb version of the repositories
 │   │   ├── errors.py               # The errors the repositories raise
 │   │   ├── protocols.py            # The interface every repository follows
 │   │   ├── records.py              # The plain records the repositories return
@@ -73,8 +77,13 @@ server/
 │   └── main.py                   # App entrypoint and database lifespan setup
 ├── scripts/
 │   ├── keepalive_supabase.py     # Pings the old supabase project so it is not paused
+│   ├── copy_media_to_s3.py       # Copies the song files from cloudinary to the bucket
 │   ├── migrate_google_sub.py     # Adds the google_sub column and fills it from supabase
+│   ├── migrate_users_to_dynamodb.py # Moves the users to dynamodb
+│   ├── migrate_content_to_dynamodb.py # Moves the songs, playlists, and favourites
 │   └── setup_s3_bucket.py        # Makes the s3 bucket and the rule for unused uploads
+├── infra/
+│   └── cdk/                     # The aws infrastructure of the project
 ├── tests/                        # Pytest suite, it runs on a temporary sqlite database
 ├── .env                          # Configuration environment variables
 ├── .env.example                  # The same variables with empty values
@@ -146,6 +155,50 @@ MEDIA_BASE_URL=<the url the files are served from, empty means the s3 url>
 ```
 
 The `SESSION_SECRET` signs the session tokens. When it changes, every user has to sign in again.
+
+### The Database
+
+The app talks to the database through the repository interfaces in `app/repositories/`, so the routes do not know where the data lives. There are two implementations:
+
+- `sqlmodel_repositories.py` for the old PostgreSQL database
+- `dynamodb_repositories.py` for DynamoDB
+
+The `DB_BACKEND` setting picks the one that is used, `sqlmodel` or `dynamodb`. When it is `dynamodb` the PostgreSQL session is never opened.
+
+Everything sits in one DynamoDB table, the key of an item says what the item is:
+
+```text
+USER#<user id>                    PROFILE              the user
+USER#<user id>                    FAV#<song id>        a favourite of the user
+USERGOOGLE#<google sub>           USER                 where the user with that google id is
+USEREMAIL#<email>                 USER                 where the user with that email is
+SONG#<song id>                    META                 the song
+SONGNAME#<name>#<song id>         <name>#<song id>     the song in the order of its name
+SONGARTIST#<artist>#<song id>     <name>#<song id>     the song in the order of its artist
+SONGTAG#<tag>#<song id>           <name>#<song id>     one item for every tag of the song
+PLAYLIST#<playlist id>            META                 the playlist
+PLAYLIST#<playlist id>            SONG#<song id>       a song of the playlist
+USERPLAYLIST#<user id>#<list id>  <time>#<list id>    the playlist in the list of the user
+```
+
+The search looks at the start of the name, the artist, or a tag, and the songs come back in the alphabetical order because the name is also in the sort key. The table is on provisioned capacity because the free tier only pays for that.
+
+The table is made by the CDK stack in `infra/cdk`:
+
+```bash
+cd infra/cdk
+cdk deploy
+```
+
+The data of the old database is moved with the scripts below, they need the database url of the old Supabase project:
+
+```bash
+python scripts/migrate_users_to_dynamodb.py
+python scripts/copy_media_to_s3.py
+python scripts/migrate_content_to_dynamodb.py
+```
+
+The first script moves the users, the second copies the song files from Cloudinary to the bucket and writes a `media_map.json` file, and the third moves the songs, the playlists, and the favourites and uses that map for the new file urls.
 
 ### The Song Files
 
