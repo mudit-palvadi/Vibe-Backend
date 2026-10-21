@@ -80,7 +80,12 @@ def auth_headers():
 
 @pytest.fixture()
 def current_user(session, token_payload):
-    user = User(id=UUID(token_payload["sub"]), name="Test User", email=token_payload["email"])
+    user = User(
+        id=UUID(token_payload["sub"]),
+        name="Test User",
+        email=token_payload["email"],
+        google_sub=token_payload["google_sub"],
+    )
     session.add(user)
     session.commit()
     session.refresh(user)

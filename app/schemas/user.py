@@ -18,7 +18,18 @@ class LoginRequest(BaseModel):
     id_token: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 class AuthLoginResponse(BaseModel):
+    message: str
+    session_token: str
+    expires_in: int
+    user: UserResponse
+
+
+class AuthRefreshResponse(BaseModel):
     message: str
     session_token: str
     expires_in: int
