@@ -13,6 +13,7 @@ os.environ.setdefault("SESSION_SECRET", "test-session-secret-that-is-long-enough
 
 import pytest
 from fastapi.testclient import TestClient
+from jwks_server import JwksTestServer, build_key_pair
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.db.database import get_session
@@ -28,6 +29,14 @@ test_engine = create_engine(
 
 TEST_SUB = "11111111-1111-4111-8111-111111111111"
 TEST_EMAIL = "test@example.com"
+
+
+@pytest.fixture(scope="session")
+def jwks_server():
+    """a jwks server on localhost so the tests can use real signed tokens"""
+    server = JwksTestServer(build_key_pair()).start()
+    yield server
+    server.stop()
 
 
 @pytest.fixture()
