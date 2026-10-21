@@ -2,10 +2,13 @@
 
 import json
 import threading
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
+
+from app.core.config import settings
 
 TEST_KID = "vibe-test-key"
 
@@ -66,3 +69,22 @@ class JwksTestServer:
     def stop(self) -> None:
         self.server.shutdown()
         self.server.server_close()
+
+
+def sign_google_token(server: JwksTestServer, drop: tuple[str, ...] = (), **overrides) -> str:
+    """signs a google id token like the one the client sends after a google login"""
+    payload = {
+        "sub": "google-sub-1",
+        "email": "someone@gmail.com",
+        "name": "Someone",
+        "iss": "https://accounts.google.com",
+        "aud": settings.GOOGLE_CLIENT_ID,
+        "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
+    }
+
+    payload.update(overrides)
+
+    for claim in drop:
+        payload.pop(claim, None)
+
+    return server.sign(payload)

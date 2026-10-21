@@ -68,7 +68,6 @@ def mock_verify_token(token_payload, monkeypatch):
     monkeypatch.setattr(
         "app.middleware.auth_middleware.verify_token", lambda token: dict(token_payload)
     )
-    monkeypatch.setattr("app.routes.auth_routes.verify_token", lambda token: dict(token_payload))
     return token_payload
 
 
