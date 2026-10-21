@@ -42,3 +42,55 @@ def build_final_key(temp_key: str) -> str:
 
 def is_temp_key(key: str, song_id: str) -> bool:
     return key.startswith(f"{TEMP_PREFIX}/{song_id}/")
+
+
+def create_upload_url(key: str, content_type: str) -> dict:
+    """the link the client puts the file on"""
+    url = get_s3_client().generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": settings.S3_BUCKET,
+            "Key": key,
+            "ContentType": content_type,
+        },
+        ExpiresIn=settings.S3_UPLOAD_URL_EXPIRY,
+    )
+
+    return {
+        "key": key,
+        "url": url,
+        "headers": {"Content-Type": content_type},
+    }
+
+
+def object_exists(key: str) -> bool:
+    from botocore.exceptions import ClientError
+
+    try:
+        get_s3_client().head_object(Bucket=settings.S3_BUCKET, Key=key)
+        return True
+    except ClientError:
+        return False
+
+
+def copy_to_final_place(temp_key: str) -> str:
+    """moves an uploaded file to the place the song files live"""
+    final_key = build_final_key(temp_key)
+    client = get_s3_client()
+
+    client.copy_object(
+        Bucket=settings.S3_BUCKET,
+        Key=final_key,
+        CopySource={"Bucket": settings.S3_BUCKET, "Key": temp_key},
+        ContentType=guess_content_type(temp_key),
+    )
+    client.delete_object(Bucket=settings.S3_BUCKET, Key=temp_key)
+
+    return final_key
+
+
+def media_url(key: str) -> str:
+    base = settings.MEDIA_BASE_URL or (
+        f"https://{settings.S3_BUCKET}.s3.{settings.S3_REGION}.amazonaws.com"
+    )
+    return f"{base.rstrip('/')}/{key}"
