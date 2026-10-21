@@ -27,7 +27,7 @@ def google_login(
     user = users.get_by_google_sub(identity.sub)
 
     if not user:
-        # an account that was made with supabase is found by the email
+        # an account from the old database is found by the email
         user = users.get_by_email(identity.email)
 
         if user:

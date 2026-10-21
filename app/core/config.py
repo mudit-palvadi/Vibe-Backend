@@ -3,8 +3,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str = ""
-    # the old supabase project, only used by the keepalive and the migration scripts
-    SUPABASE_URL: str = ""
     # google oauth, the client id is checked against the id token audience
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
@@ -28,9 +26,6 @@ class Settings(BaseSettings):
     DB_BACKEND: str = "sqlmodel"
     DYNAMODB_TABLE_NAME: str = "vibe"
     AWS_REGION: str = "ap-south-1"
-
-    # only needed by the one off scripts that read the old supabase data
-    SUPABASE_SERVICE_ROLE_KEY: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

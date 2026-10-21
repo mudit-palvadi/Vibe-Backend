@@ -28,7 +28,7 @@ def get_connection():
 
 
 def has_google_sub(connection) -> bool:
-    # the column is only there when the supabase script ran before
+    # the column is only there when the old database got it
     with connection.cursor() as cursor:
         cursor.execute(
             "select 1 from information_schema.columns "
