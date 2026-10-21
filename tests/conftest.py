@@ -8,6 +8,8 @@ os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("CLOUDINARY_CLOUD_NAME", "test-cloud")
 os.environ.setdefault("CLOUDINARY_API_KEY", "test-key")
 os.environ.setdefault("CLOUDINARY_API_SECRET", "test-secret")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
+os.environ.setdefault("SESSION_SECRET", "test-session-secret-that-is-long-enough-123")
 
 import pytest
 from fastapi.testclient import TestClient
