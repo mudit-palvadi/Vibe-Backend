@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
@@ -23,15 +25,16 @@ def google_auth(authorization: str = Header(), session: Session = Depends(get_se
     payload = verify_token(token)
     email = payload["email"]
     name = payload.get("user_metadata", {}).get("full_name", "User")
+    user_sub = UUID(payload["sub"])
     user = session.exec(select(User).where(User.email == email)).first()
 
     if not user:
-        user = User(id=payload["sub"], name=name, email=email)
+        user = User(id=user_sub, name=name, email=email)
         session.add(user)
         session.commit()
         session.refresh(user)
-    elif str(user.id) != payload["sub"]:
-        user.id = payload["sub"]
+    elif user.id != user_sub:
+        user.id = user_sub
         session.add(user)
         session.commit()
         session.refresh(user)
