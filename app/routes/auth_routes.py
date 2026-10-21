@@ -1,46 +1,50 @@
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 
-from app.auth.jwt_handler import verify_token
+from app.auth.google import verify_google_id_token
+from app.auth.session import create_session_token
 from app.db.database import get_session
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
-from app.schemas.user import AuthLoginResponse, UserWithFavouritesResponse
+from app.schemas.user import AuthLoginResponse, LoginRequest, UserWithFavouritesResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=AuthLoginResponse)
-def google_auth(authorization: str = Header(), session: Session = Depends(get_session)):
+def google_login(request: LoginRequest, session: Session = Depends(get_session)):
+    identity = verify_google_id_token(request.id_token)
 
-    try:
-        token = authorization.split(" ")[1]
-
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid authorization header") from None
-
-    payload = verify_token(token)
-    email = payload["email"]
-    name = payload.get("user_metadata", {}).get("full_name", "User")
-    user_sub = UUID(payload["sub"])
-    user = session.exec(select(User).where(User.email == email)).first()
+    user = session.exec(select(User).where(User.google_sub == identity.sub)).first()
 
     if not user:
-        user = User(id=user_sub, name=name, email=email)
+        # an account that was made with supabase is found by the email
+        user = session.exec(select(User).where(User.email == identity.email)).first()
+
+        if user:
+            user.google_sub = identity.sub
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+    if not user:
+        user = User(name=identity.name, email=identity.email, google_sub=identity.sub)
         session.add(user)
         session.commit()
         session.refresh(user)
-    elif user.id != user_sub:
-        user.id = user_sub
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+
+    session_token, expires_in = create_session_token(
+        user_id=str(user.id),
+        google_sub=identity.sub,
+        email=user.email,
+        name=user.name,
+    )
 
     return {
         "message": "Authentication successful",
+        "session_token": session_token,
+        "expires_in": expires_in,
         "user": {"id": str(user.id), "name": user.name, "email": user.email},
     }
 

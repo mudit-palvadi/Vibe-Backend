@@ -14,8 +14,14 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LoginRequest(BaseModel):
+    id_token: str
+
+
 class AuthLoginResponse(BaseModel):
     message: str
+    session_token: str
+    expires_in: int
     user: UserResponse
 
 
