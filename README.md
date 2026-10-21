@@ -52,6 +52,13 @@ server/
 │   │   ├── playlist.py           # Playlist and playlist_songs junction tables
 │   │   ├── song.py               # Song metadata model
 │   │   └── user.py               # User profile model
+│   ├── repositories/
+│   │   ├── dependencies.py         # Gives the routes the repository they should use
+│   │   ├── errors.py               # The errors the repositories raise
+│   │   ├── protocols.py            # The interface every repository follows
+│   │   ├── records.py              # The plain records the repositories return
+│   │   ├── sqlmodel_repositories.py # The postgres version of the repositories
+│   │   └── tags.py                 # Reads and writes the tags of a song
 │   ├── routes/
 │   │   ├── auth_routes.py        # Authentication routes
 │   │   ├── playlist_routes.py    # Playlist management routes
@@ -61,9 +68,13 @@ server/
 │   │   ├── playlist.py           # Playlist request/response schemas
 │   │   ├── song.py               # Song response schemas
 │   │   └── user.py               # User and auth response schemas
+│   ├── storage/
+│   │   └── s3.py                 # The s3 client, the upload links, and the file urls
 │   └── main.py                   # App entrypoint and database lifespan setup
 ├── scripts/
-│   └── migrate_google_sub.py     # Adds the google_sub column and fills it from supabase
+│   ├── keepalive_supabase.py     # Pings the old supabase project so it is not paused
+│   ├── migrate_google_sub.py     # Adds the google_sub column and fills it from supabase
+│   └── setup_s3_bucket.py        # Makes the s3 bucket and the rule for unused uploads
 ├── tests/                        # Pytest suite, it runs on a temporary sqlite database
 ├── .env                          # Configuration environment variables
 ├── .env.example                  # The same variables with empty values
@@ -88,11 +99,13 @@ server/
 
 | Method | Endpoint                | Requires Token? | Description                                                          |
 | :----- | :---------------------- | :-------------: | :------------------------------------------------------------------- |
-| `POST` | `/song/upload`          |       Yes       | Uploads a song audio and thumbnail to Cloudinary and saves metadata. |
-| `GET`  | `/song/list`            |       Yes       | Lists all available songs.                                           |
-| `GET`  | `/song/search`          |       Yes       | Searches the library case-insensitively by title, artist, or tags.   |
-| `POST` | `/song/favourite`       |       Yes       | Toggles a song as a user favorite.                                   |
-| `GET`  | `/song/list-favourites` |       Yes       | Returns all the user's favorite songs.                               |
+| `POST` | `/song/upload-init`     |       Yes       | Gives the upload links for the song files.                         |
+| `POST` | `/song/upload-complete` |       Yes       | Moves the uploaded files to their place and saves the metadata.    |
+| `POST` | `/song/upload`          |       Yes       | The old upload that goes to cloudinary, it is turned off later.   |
+| `GET`  | `/song/list`            |       Yes       | Lists all available songs.                                         |
+| `GET`  | `/song/search`          |       Yes       | Searches the library by the start of the title, artist, or tags.  |
+| `POST` | `/song/favourite`       |       Yes       | Toggles a song as a user favorite.                                 |
+| `GET`  | `/song/list-favourites` |       Yes       | Returns all the user's favorite songs.                             |
 
 ### Playlist Endpoints
 
@@ -127,9 +140,28 @@ GOOGLE_CLIENT_ID=<the client id of the google desktop app>
 GOOGLE_CLIENT_SECRET=<the client secret of the google desktop app>
 SESSION_SECRET=<a long random string of at least 32 characters>
 SESSION_TTL_DAYS=30
+S3_BUCKET=<the name of the bucket that holds the song files>
+S3_REGION=ap-south-1
+MEDIA_BASE_URL=<the url the files are served from, empty means the s3 url>
 ```
 
 The `SESSION_SECRET` signs the session tokens. When it changes, every user has to sign in again.
+
+### The Song Files
+
+The song files live in an s3 bucket. The client never sends the files to the backend, it puts them on the bucket itself with the links the backend gives:
+
+1. The client asks `POST /song/upload-init` with the name of the song, the artist, the tags, and the file names. The backend answers with a song id and two upload links, one for the audio and one for the thumbnail.
+2. The client puts the files on those links. They are ordinary `PUT` requests with a `Content-Type` header, and the links stop working after `S3_UPLOAD_URL_EXPIRY` seconds.
+3. The client asks `POST /song/upload-complete` with the song id, the details of the song, and the two keys it used. The backend moves the files from `tmp/` to `songs/` and saves the song.
+
+The files are uploaded to the `tmp/` folder first. The bucket has a rule that removes everything in `tmp/` after a day, so the uploads that were never finished do not stay there forever. The rule is made by the script below:
+
+```bash
+python scripts/setup_s3_bucket.py
+```
+
+The old `POST /song/upload` endpoint goes to cloudinary. It is still there for the old client, `LEGACY_UPLOAD_ENABLED=false` in the `.env` file turns it off.
 
 ### Google OAuth Setup
 
