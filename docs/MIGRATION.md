@@ -14,7 +14,7 @@ working until the new one is checked.
 | the `users` table of the old postgres database | the `USER#<id>` items in the `vibe` table |
 | the `songs`, `playlists`, `playlist_songs` and `favourites` tables | the `SONG#<id>`, `PLAYLIST#<id>` and `IDX_` items in the same table |
 | the song files in Cloudinary | the `songs/<song id>/` objects in the S3 bucket |
-| the google login of Supabase | the google login of the app, the `google_sub` keeps the link |
+| the google login of the old project | the google login of the app, the google id keeps the link |
 
 The user id does not change, so the playlists and the favourites of every user
 stay connected to their owner.
@@ -80,10 +80,6 @@ moved without a google id is found by the email the first time they sign in,
 and the api writes the google id down then. So nothing has to be done for the
 move.
 
-`scripts/migrate_google_sub.py` fills the column in the old database from the
-`auth.identities` table of Supabase. It is only needed when the google id has
-to be known before the first sign in.
-
 ## The checks
 
 ```bash
@@ -100,12 +96,4 @@ and the old favourites.
 ## The old project
 
 When everything is checked, the old api and the old database can be shut down.
-Supabase only held the google login, so it can be closed too. Until then the
-`keepalive` script keeps it awake:
-
-```bash
-python scripts/keepalive_supabase.py
-```
-
-The github action in `.github/workflows/supabase-keepalive.yml` does the same
-every three days.
+The old project only held the google login, so it can be closed too.

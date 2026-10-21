@@ -99,18 +99,14 @@ cdk deploy EdgeStack --require-approval never
 
 ## The data move
 
-The old data is still in supabase and cloudinary. The scripts do the move, they
-read the old project and write the new one. They read the old database and the
-old supabase project from the `.env` file of the server folder:
+The old data is still in the old database and in cloudinary. The scripts do the
+move, they read the old one and write the new one. They read the old database
+from the `.env` file of the server folder:
 
 ```powershell
-# the old database, the connection string of the supabase project
-# DATABASE_URL=postgresql://<user>:<password>@<host>:5432/postgres
-# the old supabase project
-# SUPABASE_URL=https://<project>.supabase.co
-# SUPABASE_SERVICE_ROLE_KEY=<the service role key>
+# the old database, the connection string of the old postgres
+# DATABASE_URL=postgresql://<user>:<password>@<host>:5432/vibe
 
-python scripts/migrate_google_sub.py            # once, adds the google id to the old database
 python scripts/migrate_users_to_dynamodb.py     # the users, with their google ids
 python scripts/copy_media_to_s3.py              # the song files, it writes scripts/media_map.json
 python scripts/migrate_content_to_dynamodb.py   # the songs, the playlists and the favourites

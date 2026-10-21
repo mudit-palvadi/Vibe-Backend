@@ -76,9 +76,7 @@ server/
 │   │   └── s3.py                 # The s3 client, the upload links, and the file urls
 │   └── main.py                   # App entrypoint and database lifespan setup
 ├── scripts/
-│   ├── keepalive_supabase.py     # Pings the old supabase project so it is not paused
 │   ├── copy_media_to_s3.py       # Copies the song files from cloudinary to the bucket
-│   ├── migrate_google_sub.py     # Adds the google_sub column and fills it from supabase
 │   ├── migrate_users_to_dynamodb.py # Moves the users to dynamodb
 │   ├── migrate_content_to_dynamodb.py # Moves the songs, playlists, and favourites
 │   └── setup_s3_bucket.py        # Makes the s3 bucket and the rule for unused uploads
@@ -140,8 +138,6 @@ Copy the `.env.example` file to `.env` in the root of the server folder and fill
 
 ```ini
 DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<database_name>
-SUPABASE_URL=https://<your-project-id>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<the service role key of the old project>
 GOOGLE_CLIENT_ID=<the client id of the google client>
 GOOGLE_CLIENT_SECRET=<the client secret of the google client>
 SESSION_SECRET=<a long random string of at least 32 characters>
@@ -190,7 +186,7 @@ cd infra/cdk
 cdk deploy
 ```
 
-The data of the old database is moved with the scripts below, they need the database url of the old Supabase project:
+The data of the old database is moved with the scripts below, they need the database url of the old database:
 
 ```bash
 python scripts/migrate_users_to_dynamodb.py
@@ -246,9 +242,7 @@ The `.env` file of the server holds the old database and the Google client, the 
 
 | Setting | Where it comes from |
 | --- | --- |
-| `DATABASE_URL` | Supabase, **Settings** → **Database** → the connection string |
-| `SUPABASE_URL` | Supabase, **Settings** → **API** → the project url |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase, **Settings** → **API** → the service role key |
+| `DATABASE_URL` | the old postgres database, the connection string |
 | `GOOGLE_CLIENT_ID` | Google Cloud console, **Credentials** → the OAuth client id |
 | `GOOGLE_CLIENT_SECRET` | Google Cloud console, **Credentials** → the OAuth client secret |
 | `DYNAMODB_TABLE_NAME` | the name of the table, `vibe` |
@@ -256,7 +250,7 @@ The `.env` file of the server holds the old database and the Google client, the 
 | `MEDIA_BASE_URL` | the address of the CloudFront distribution |
 | `SESSION_SECRET` | the parameter store `/vibe/session-secret`, it is made on the first deploy |
 
-The scripts that move the data need the first three, the rest of the app only talks to the aws account.
+The scripts that move the data need the first one, the rest of the app only talks to the aws account.
 
 ### The free plan
 
@@ -264,13 +258,7 @@ The aws account is on the free plan, so the CloudFront flat rate plan is not ava
 
 ### The old accounts
 
-The users that signed in with Supabase keep their account. The `users` table got a `google_sub` column with the Google id of the account, and the script below fills it:
-
-```bash
-python scripts/migrate_google_sub.py
-```
-
-The script adds the column when it is not there yet, then it reads the Google accounts from the old Supabase project and puts the Google id next to the email of the user. The first login with Google finds the account by that Google id, and if it is not there yet it looks for the email, so the old favorites and playlists stay where they are.
+The users of the old database keep their account, their id, their favourites and their playlists. The first login with Google finds the account by the Google id, and if it is not there yet it looks for the email, so the old favourites and playlists stay where they are.
 
 ### Installation
 
