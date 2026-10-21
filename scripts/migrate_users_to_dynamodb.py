@@ -68,7 +68,8 @@ def main() -> None:
             user_id=str(user["id"]),
             name=user["name"],
             email=user["email"],
-            google_sub=user["google_sub"],
+            # the column is not there when the users never signed in with google yet
+            google_sub=user.get("google_sub"),
         )
         print(f"moved the user {user['email']}")
 
