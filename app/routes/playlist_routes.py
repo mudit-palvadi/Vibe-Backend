@@ -1,25 +1,24 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
+
 from app.db.database import get_session
+from app.middleware.auth_middleware import get_current_user
 from app.models.playlist import Playlist, PlaylistSongLink
 from app.models.song import Song
 from app.models.user import User
 from app.schemas.playlist import (
+    AddPlaylistSong,
     PlaylistCreate,
     PlaylistResponse,
     PlaylistWithSongsResponse,
-    AddPlaylistSong,
 )
-from app.middleware.auth_middleware import get_current_user
-from typing import List
-from uuid import UUID
 
 router = APIRouter(prefix="/playlist", tags=["Playlists"])
 
 
-@router.post(
-    "/create", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/create", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
 def create_playlist(
     playlist_data: PlaylistCreate,
     session: Session = Depends(get_session),
@@ -37,7 +36,7 @@ def create_playlist(
     return playlist
 
 
-@router.get("/list", response_model=List[PlaylistResponse])
+@router.get("/list", response_model=list[PlaylistResponse])
 def get_user_playlists(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
@@ -68,9 +67,7 @@ def add_song_to_playlist(
     # Verify playlist ownership
     playlist = session.get(Playlist, data.playlist_id)
     if not playlist or playlist.user_id != current_user.id:
-        raise HTTPException(
-            status_code=404, detail="Playlist not found or access denied"
-        )
+        raise HTTPException(status_code=404, detail="Playlist not found or access denied")
 
     # Verify song exists
     song = session.get(Song, data.song_id)
@@ -101,9 +98,7 @@ def remove_song_from_playlist(
 ):
     playlist = session.get(Playlist, data.playlist_id)
     if not playlist or playlist.user_id != current_user.id:
-        raise HTTPException(
-            status_code=404, detail="Playlist not found or access denied"
-        )
+        raise HTTPException(status_code=404, detail="Playlist not found or access denied")
 
     statement = select(PlaylistSongLink).where(
         PlaylistSongLink.playlist_id == data.playlist_id,
@@ -111,9 +106,7 @@ def remove_song_from_playlist(
     )
     entry = session.exec(statement).first()
     if not entry:
-        raise HTTPException(
-            status_code=404, detail="Song relation not found in this playlist"
-        )
+        raise HTTPException(status_code=404, detail="Song relation not found in this playlist")
 
     session.delete(entry)
     session.commit()
@@ -128,9 +121,7 @@ def delete_playlist(
 ):
     playlist = session.get(Playlist, playlist_id)
     if not playlist or playlist.user_id != current_user.id:
-        raise HTTPException(
-            status_code=404, detail="Playlist not found or access denied"
-        )
+        raise HTTPException(status_code=404, detail="Playlist not found or access denied")
 
     session.delete(playlist)
     session.commit()

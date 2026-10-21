@@ -1,8 +1,10 @@
-from pydantic import BaseModel
-from uuid import UUID
 from datetime import datetime
-from typing import List
+from uuid import UUID
+
+from pydantic import BaseModel
+
 from app.schemas.song import SongResponse
+
 
 class UserResponse(BaseModel):
     id: UUID
@@ -32,6 +34,6 @@ class UserWithFavouritesResponse(BaseModel):
     email: str
     created_at: datetime
     updated_at: datetime
-    favourites: List[FavouriteResponse]
+    favourites: list[FavouriteResponse]
 
     model_config = {"from_attributes": True}

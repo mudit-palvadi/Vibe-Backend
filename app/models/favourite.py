@@ -1,6 +1,12 @@
-from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
+
 from app.models.song import Song
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class Favourite(SQLModel, table=True):

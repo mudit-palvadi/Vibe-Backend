@@ -1,19 +1,19 @@
 import uuid
-from typing import List
-from fastapi import APIRouter, Depends, File, Form, UploadFile, Query
-from sqlmodel import Session, select, or_
-from sqlalchemy.orm import joinedload
-from app.db.database import get_session
+
 import cloudinary
 import cloudinary.uploader
-from cloudinary.utils import cloudinary_url
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from sqlalchemy.orm import joinedload
+from sqlmodel import Session, or_, select
+
 from app.core.config import settings
+from app.db.database import get_session
 from app.middleware.auth_middleware import get_current_user
 from app.models.favourite import Favourite
-from app.schemas.favourite import FavouriteSong
 from app.models.song import Song
 from app.models.user import User
-from app.schemas.song import SongResponse, SongUploadResponse, FavouriteToggleResponse
+from app.schemas.favourite import FavouriteSong
+from app.schemas.song import FavouriteToggleResponse, SongResponse, SongUploadResponse
 from app.schemas.user import FavouriteResponse
 
 router = APIRouter(prefix="/song", tags=["Upload Song"])
@@ -70,15 +70,13 @@ def upload_song(
     }
 
 
-@router.get("/list", status_code=200, response_model=List[SongResponse])
-def fetchSongs(
-    db: Session = Depends(get_session), auth_details: User = Depends(get_current_user)
-):
+@router.get("/list", status_code=200, response_model=list[SongResponse])
+def fetchSongs(db: Session = Depends(get_session), auth_details: User = Depends(get_current_user)):
     songs = db.exec(select(Song)).all()
     return songs
 
 
-@router.get("/search", response_model=List[SongResponse])
+@router.get("/search", response_model=list[SongResponse])
 def search_songs(
     q: str = Query(..., min_length=1),
     db: Session = Depends(get_session),
@@ -105,9 +103,7 @@ def favouriteSong(
     user_id = auth_details.id
 
     fav_song_res = db.exec(
-        select(Favourite).where(
-            Favourite.song_id == fav_song.song_id, Favourite.user_id == user_id
-        )
+        select(Favourite).where(Favourite.song_id == fav_song.song_id, Favourite.user_id == user_id)
     ).first()
 
     if fav_song_res:
@@ -116,22 +112,18 @@ def favouriteSong(
 
         return {"message": False}
     else:
-        new_fav = Favourite(
-            id=str(uuid.uuid4()), song_id=fav_song.song_id, user_id=user_id
-        )
+        new_fav = Favourite(id=str(uuid.uuid4()), song_id=fav_song.song_id, user_id=user_id)
         db.add(new_fav)
         db.commit()
         return {"message": True}
 
 
-@router.get("/list-favourites", status_code=200, response_model=List[FavouriteResponse])
+@router.get("/list-favourites", status_code=200, response_model=list[FavouriteResponse])
 def fetchFavSongs(
     db: Session = Depends(get_session), auth_details: User = Depends(get_current_user)
 ):
     user_id = auth_details.id
     fav_songs = db.exec(
-        select(Favourite)
-        .where(Favourite.user_id == user_id)
-        .options(joinedload(Favourite.song))
+        select(Favourite).where(Favourite.user_id == user_id).options(joinedload(Favourite.song))
     ).all()
     return fav_songs

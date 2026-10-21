@@ -1,7 +1,8 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import List
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
-from datetime import datetime, UTC
+
+from sqlmodel import Field, Relationship, SQLModel
+
 from app.models.favourite import Favourite
 
 
@@ -18,4 +19,4 @@ class User(SQLModel, table=True):
 
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    favourites: List["Favourite"] = Relationship(back_populates="user")
+    favourites: list["Favourite"] = Relationship(back_populates="user")

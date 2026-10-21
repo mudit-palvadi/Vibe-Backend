@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from sqlmodel import SQLModel
+
 from app.db.database import engine
-from app.models.user import User
 from app.routes.auth_routes import router as auth_router
-from app.routes.song_routes import router as song_router
 from app.routes.playlist_routes import router as playlist_router
+from app.routes.song_routes import router as song_router
 
 
 @asynccontextmanager

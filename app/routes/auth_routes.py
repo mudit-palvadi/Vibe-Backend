@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Header, Depends, HTTPException
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import joinedload
+from sqlmodel import Session, select
+
+from app.auth.jwt_handler import verify_token
 from app.db.database import get_session
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
-from app.auth.jwt_handler import verify_token
 from app.schemas.user import AuthLoginResponse, UserWithFavouritesResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -17,7 +18,7 @@ def google_auth(authorization: str = Header(), session: Session = Depends(get_se
         token = authorization.split(" ")[1]
 
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
+        raise HTTPException(status_code=401, detail="Invalid authorization header") from None
 
     payload = verify_token(token)
     email = payload["email"]
@@ -47,9 +48,7 @@ def current_user_data(
     current_user: User = Depends(get_current_user),
 ):
     user = db.exec(
-        select(User)
-        .where(User.id == current_user.id)
-        .options(joinedload(User.favourites))
+        select(User).where(User.id == current_user.id).options(joinedload(User.favourites))
     ).first()
 
     if not user:
