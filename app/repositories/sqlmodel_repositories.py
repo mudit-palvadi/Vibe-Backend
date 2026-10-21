@@ -86,8 +86,20 @@ class SqlModelUserRepository:
         user = self.session.exec(select(User).where(User.google_sub == google_sub)).first()
         return _user_record(user) if user else None
 
-    def create(self, *, name: str, email: str, google_sub: str | None = None) -> UserRecord:
-        user = User(name=name, email=email, google_sub=google_sub)
+    def create(
+        self,
+        *,
+        name: str,
+        email: str,
+        google_sub: str | None = None,
+        user_id: str | None = None,
+    ) -> UserRecord:
+        user = User(
+            id=_to_uuid(user_id) or uuid.uuid4(),
+            name=name,
+            email=email,
+            google_sub=google_sub,
+        )
         self.session.add(user)
         self.session.commit()
         self.session.refresh(user)
@@ -180,12 +192,14 @@ class SqlModelPlaylistRepository:
         name: str,
         description: str | None = None,
         thumbnail_url: str | None = None,
+        playlist_id: str | None = None,
     ) -> PlaylistRecord:
         user_uuid = _to_uuid(user_id)
         if not user_uuid:
             raise UserNotFoundError(f"no user with the id {user_id}")
 
         playlist = Playlist(
+            id=_to_uuid(playlist_id) or uuid.uuid4(),
             user_id=user_uuid,
             name=name,
             description=description,

@@ -16,7 +16,14 @@ class UserRepository(Protocol):
 
     def get_by_google_sub(self, google_sub: str) -> UserRecord | None: ...
 
-    def create(self, *, name: str, email: str, google_sub: str | None = None) -> UserRecord: ...
+    def create(
+        self,
+        *,
+        name: str,
+        email: str,
+        google_sub: str | None = None,
+        user_id: str | None = None,
+    ) -> UserRecord: ...
 
     def set_google_sub(self, user_id: str, google_sub: str) -> UserRecord: ...
 
@@ -50,6 +57,7 @@ class PlaylistRepository(Protocol):
         name: str,
         description: str | None = None,
         thumbnail_url: str | None = None,
+        playlist_id: str | None = None,
     ) -> PlaylistRecord: ...
 
     def get(self, playlist_id: str) -> PlaylistRecord | None: ...

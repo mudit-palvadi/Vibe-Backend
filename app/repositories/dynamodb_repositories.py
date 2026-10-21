@@ -161,8 +161,15 @@ class DynamoDbUserRepository(DynamoDbBase, UserRepository):
             return None
         return self.get_by_id(item["user_id"])
 
-    def create(self, *, name: str, email: str, google_sub: str | None = None) -> UserRecord:
-        user_id = str(uuid.uuid4())
+    def create(
+        self,
+        *,
+        name: str,
+        email: str,
+        google_sub: str | None = None,
+        user_id: str | None = None,
+    ) -> UserRecord:
+        user_id = user_id or str(uuid.uuid4())
         now = _now()
 
         items = [
@@ -348,8 +355,9 @@ class DynamoDbPlaylistRepository(DynamoDbBase, PlaylistRepository):
         name: str,
         description: str | None = None,
         thumbnail_url: str | None = None,
+        playlist_id: str | None = None,
     ) -> PlaylistRecord:
-        playlist_id = str(uuid.uuid4())
+        playlist_id = playlist_id or str(uuid.uuid4())
         now = _now()
 
         details = _without_empty(
