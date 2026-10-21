@@ -40,3 +40,17 @@ class UploadInitResponse(BaseModel):
     audio: UploadPart
     thumbnail: UploadPart
     expires_in: int
+
+
+class UploadCompleteRequest(BaseModel):
+    song_id: str
+    song_name: str = Field(..., min_length=1)
+    artist: str = Field(..., min_length=1)
+    tags: str = ""
+    audio_key: str
+    thumbnail_key: str
+
+
+class UploadCompleteResponse(BaseModel):
+    message: str
+    song: SongResponse

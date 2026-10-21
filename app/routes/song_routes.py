@@ -2,7 +2,7 @@ import uuid
 
 import cloudinary
 import cloudinary.uploader
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.core.config import settings
 from app.middleware.auth_middleware import get_current_user
@@ -14,14 +14,20 @@ from app.schemas.song import (
     FavouriteToggleResponse,
     SongResponse,
     SongUploadResponse,
+    UploadCompleteRequest,
+    UploadCompleteResponse,
     UploadInitRequest,
     UploadInitResponse,
 )
 from app.schemas.user import FavouriteResponse
 from app.storage.s3 import (
     build_temp_key,
+    copy_to_final_place,
     create_upload_url,
     guess_content_type,
+    is_temp_key,
+    media_url,
+    object_exists,
 )
 
 router = APIRouter(prefix="/song", tags=["Upload Song"])
@@ -93,6 +99,35 @@ def upload_init(
         ),
         "expires_in": settings.S3_UPLOAD_URL_EXPIRY,
     }
+
+
+@router.post("/upload-complete", status_code=201, response_model=UploadCompleteResponse)
+def upload_complete(
+    request: UploadCompleteRequest,
+    songs: SongRepository = Depends(get_song_repository),
+    auth_user: UserRecord = Depends(get_current_user),
+):
+    if not is_temp_key(request.audio_key, request.song_id) or not is_temp_key(
+        request.thumbnail_key, request.song_id
+    ):
+        raise HTTPException(status_code=400, detail="The upload keys do not belong to this song")
+
+    if not object_exists(request.audio_key) or not object_exists(request.thumbnail_key):
+        raise HTTPException(status_code=404, detail="The files are not in the bucket yet")
+
+    audio_key = copy_to_final_place(request.audio_key)
+    thumbnail_key = copy_to_final_place(request.thumbnail_key)
+
+    song = songs.create(
+        song_id=request.song_id,
+        song_name=request.song_name,
+        artist=request.artist,
+        tags=request.tags,
+        song_url=media_url(audio_key),
+        thumbnail_url=media_url(thumbnail_key),
+    )
+
+    return {"message": "Song uploaded successfully", "song": song}
 
 
 @router.get("/list", status_code=200, response_model=list[SongResponse])
