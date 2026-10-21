@@ -1,8 +1,8 @@
 # Vibe Backend
 
-This is the backend for the Vibe music app I am creating. It is built using FastAPI and SQLModel to handle the core server-side operations, including user authentication, song uploads, managing favorites, custom user playlists, and search filtering.
+This is the backend for the Vibe music app I am creating. It is built using FastAPI to handle the core server-side operations, including user authentication, song uploads, managing favorites, custom user playlists, and search filtering. It runs on AWS as a lambda function behind CloudFront.
 
-The server uploads and hosts media assets (audio files and image thumbnails) directly on Cloudinary. The users sign in with their Google account, the backend checks the Google id token with the Google public keys and hands out a session token that the app uses for every request.
+The server keeps the media assets (audio files and image thumbnails) in an S3 bucket and serves them through CloudFront. The users sign in with their Google account, the backend checks the Google id token with the Google public keys and hands out a session token that the app uses for every request.
 
 ---
 
@@ -11,7 +11,7 @@ The server uploads and hosts media assets (audio files and image thumbnails) dir
 Here is what I am using to build the backend:
 
 - **FastAPI**: The web framework for handling API routes and requests.
-- **SQLModel**: The database toolkit that combines SQLAlchemy and Pydantic so I can write pythonic database models.
+- **SQLModel**: The database toolkit that combines SQLAlchemy and Pydantic so I can write pythonic database models. It is still used for the tests and for the old database.
 - **PostgreSQL**: The relational database of the old setup, the app can still use it.
 - **DynamoDB**: The database the app uses now, everything sits in one table and the key of an item says what the item is.
 - **Repositories**: The routes only talk to the repository interfaces, so the database can be swapped without touching the routes.
@@ -110,7 +110,6 @@ server/
 | :----- | :---------------------- | :-------------: | :------------------------------------------------------------------- |
 | `POST` | `/song/upload-init`     |       Yes       | Gives the upload links for the song files.                         |
 | `POST` | `/song/upload-complete` |       Yes       | Moves the uploaded files to their place and saves the metadata.    |
-| `POST` | `/song/upload`          |       Yes       | The old upload that goes to cloudinary, it is turned off later.   |
 | `GET`  | `/song/list`            |       Yes       | Lists all available songs.                                         |
 | `GET`  | `/song/search`          |       Yes       | Searches the library by the start of the title, artist, or tags.  |
 | `POST` | `/song/favourite`       |       Yes       | Toggles a song as a user favorite.                                 |
@@ -142,19 +141,20 @@ Copy the `.env.example` file to `.env` in the root of the server folder and fill
 ```ini
 DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<database_name>
 SUPABASE_URL=https://<your-project-id>.supabase.co
-CLOUDINARY_CLOUD_NAME=<your-cloudinary-cloud-name>
-CLOUDINARY_API_KEY=<your-cloudinary-api-key>
-CLOUDINARY_API_SECRET=<your-cloudinary-api-secret>
-GOOGLE_CLIENT_ID=<the client id of the google desktop app>
-GOOGLE_CLIENT_SECRET=<the client secret of the google desktop app>
+SUPABASE_SERVICE_ROLE_KEY=<the service role key of the old project>
+GOOGLE_CLIENT_ID=<the client id of the google client>
+GOOGLE_CLIENT_SECRET=<the client secret of the google client>
 SESSION_SECRET=<a long random string of at least 32 characters>
 SESSION_TTL_DAYS=30
+DB_BACKEND=dynamodb
+DYNAMODB_TABLE_NAME=vibe
+AWS_REGION=ap-south-1
 S3_BUCKET=<the name of the bucket that holds the song files>
 S3_REGION=ap-south-1
 MEDIA_BASE_URL=<the url the files are served from, empty means the s3 url>
 ```
 
-The `SESSION_SECRET` signs the session tokens. When it changes, every user has to sign in again.
+The `SESSION_SECRET` signs the session tokens. When it changes, every user has to sign in again. When it is empty the secret is read from the parameter store `/vibe/session-secret`, that is how the lambda on aws gets it.
 
 ### The Database
 
@@ -198,7 +198,7 @@ python scripts/copy_media_to_s3.py
 python scripts/migrate_content_to_dynamodb.py
 ```
 
-The first script moves the users, the second copies the song files from Cloudinary to the bucket and writes a `media_map.json` file, and the third moves the songs, the playlists, and the favourites and uses that map for the new file urls.
+The first script moves the users, the second copies the song files from Cloudinary to the bucket and writes a `media_map.json` file, and the third moves the songs, the playlists, and the favourites and uses that map for the new file urls. The whole move is written down in [docs/MIGRATION.md](docs/MIGRATION.md).
 
 ### The Song Files
 
@@ -214,7 +214,7 @@ The files are uploaded to the `tmp/` folder first. The bucket has a rule that re
 python scripts/setup_s3_bucket.py
 ```
 
-The old `POST /song/upload` endpoint goes to cloudinary. It is still there for the old client, `LEGACY_UPLOAD_ENABLED=false` in the `.env` file turns it off.
+The old `POST /song/upload` endpoint that went to cloudinary is gone, the files go to the bucket now.
 
 ### Google OAuth Setup
 
@@ -222,22 +222,45 @@ The users sign in with their Google account, there is no password and no user da
 
 1. Open the [Google Cloud console](https://console.cloud.google.com/) and pick the project the app should use.
 2. Go to **APIs & Services** and enable the **Google Identity Services** API for that project.
-3. Go to **Credentials** and press **Create credentials** and then **OAuth client ID**.
-4. Pick the application type **Desktop app** and give it a name. Desktop apps are public clients, so the secret is not kept a secret.
-5. Google registers the loopback addresses (`http://127.0.0.1` and `http://localhost`) for a desktop app. The app opens the system browser on a free port and waits for the answer there, so no redirect url has to be added by hand.
-6. Put the client id and the client secret in the `.env` file as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+3. Go to **OAuth consent screen** first. Pick the **Testing** type and add the Google account of the people that use the app as **test users**, a testing app only lets those accounts sign in.
+4. Go to **Credentials** and press **Create credentials** and then **OAuth client ID**.
+5. Pick the application type **Web application** and give it a name. The Flutter package that does the sign in opens the system browser and comes back to `http://localhost:8000`, so that address has to be the **Authorized redirect URI** of the client. The secret of a web client is not a real secret, the app is a public client on the desktop.
+6. Put the client id and the client secret in the `.env` file of the server as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and in the `.env` file of the Flutter app as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The server also reads `GOOGLE_CLIENT_ID` from the parameter store `/vibe/google-client-id`, so the lambda always has the right one after a deploy.
 
 The sign in on the client side works like this:
 
 1. The app opens the system browser with the Google authorization url and a PKCE code challenge.
-2. Google sends the user back to the loopback address with an authorization code.
+2. Google sends the user back to `http://localhost:8000` with an authorization code.
 3. The app trades that code for an id token and a refresh token. The id token lasts about an hour, the refresh token stays valid until the user signs out of the app.
 4. The app sends the id token to `POST /auth/login`. The backend checks the id token with the Google public keys, finds or makes the user, and answers with a session token that lasts 30 days.
-5. The app sends that session token in the `Authorization: Bearer <session token>` header of every request.
-6. When the session token is about to run out, the app sends the Google refresh token to `POST /auth/refresh` together with the session token. The backend checks the refresh token with Google and answers with a new session token.
-7. If Google says the refresh token is not valid anymore, the backend answers with a 401 and the app does the Google sign in again.
+5. The app sends that session token in the `x-vibe-auth` header of every request. CloudFront signs the request it sends to the lambda and takes the `Authorization` header away, so the session token has its own header.
+6. A request that has a body also needs the `x-amz-content-sha256` header with the sha256 hash of the body, the same signing needs it to check the body it forwards.
+7. When the session token is about to run out, the app sends the Google refresh token to `POST /auth/refresh` together with the session token. The backend checks the refresh token with Google and answers with a new session token.
+8. If Google says the refresh token is not valid anymore, the backend answers with a 401 and the app does the Google sign in again.
 
 The Google refresh token never reaches the database, it stays on the client.
+
+### Where the settings come from
+
+The `.env` file of the server holds the old database and the Google client, the rest comes from the aws account:
+
+| Setting | Where it comes from |
+| --- | --- |
+| `DATABASE_URL` | Supabase, **Settings** → **Database** → the connection string |
+| `SUPABASE_URL` | Supabase, **Settings** → **API** → the project url |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase, **Settings** → **API** → the service role key |
+| `GOOGLE_CLIENT_ID` | Google Cloud console, **Credentials** → the OAuth client id |
+| `GOOGLE_CLIENT_SECRET` | Google Cloud console, **Credentials** → the OAuth client secret |
+| `DYNAMODB_TABLE_NAME` | the name of the table, `vibe` |
+| `S3_BUCKET` | the name of the bucket the cdk stack made |
+| `MEDIA_BASE_URL` | the address of the CloudFront distribution |
+| `SESSION_SECRET` | the parameter store `/vibe/session-secret`, it is made on the first deploy |
+
+The scripts that move the data need the first three, the rest of the app only talks to the aws account.
+
+### The free plan
+
+The aws account is on the free plan, so the CloudFront flat rate plan is not available for it. The distribution is on the pay as you go pricing, which gives 1 TB of traffic and 10 million requests for free every month. The web acl of CloudFront is not used, it costs about 5 dollars a month and would eat the credits of the account. The `EdgeStack` in `infra/cdk/edge_stack.py` holds the web acl and comes back when the account is on the paid plan.
 
 ### The old accounts
 
