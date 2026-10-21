@@ -11,11 +11,12 @@ there is no server to keep alive, only the aws resources.
 | the table (dynamodb) | `VibeStack` | ap-south-1 |
 | the song files (s3) | `VibeStack` | ap-south-1 |
 | the cdn (cloudfront) | `VibeStack` | global |
-| the web acl (waf) | `EdgeStack` | us-east-1 |
 | the session secret | ssm parameter `/vibe/session-secret` | ap-south-1 |
+| the google client id | ssm parameter `/vibe/google-client-id` | ap-south-1 |
 
-The web acl has to live in us-east-1 because a cloudfront web acl is a global
-resource, everything else lives in ap-south-1.
+Everything lives in ap-south-1. The web acl (waf) is not used while the
+account is on the free plan, it costs about 5 dollars a month, see the free
+plan section below.
 
 ## Before the first deploy
 
@@ -53,53 +54,65 @@ python scripts/build_lambda_zip.py
 
 # the toolkit, once per region
 cdk bootstrap aws://257209856532/ap-south-1
-cdk bootstrap aws://257209856532/us-east-1
 
-# the web acl first, the distribution needs its arn
-cdk deploy EdgeStack --require-approval never
-
-# the rest, the web acl arn comes from the edge stack
-cdk deploy VibeStack --require-approval never --context "wafAclArn=<the arn>"
+# the stack itself
+cdk deploy VibeStack --require-approval never
 ```
 
 The distribution cannot know its own domain name while it is made, so the
-media links are empty on the first deploy. After the deploy the domain is in
-the stack output, and the second deploy fills it in:
+media links are empty on the first deploy. The `app.py` of the cdk looks the
+domain up in the stack outputs, so the second deploy fills it in:
 
 ```powershell
-cdk deploy VibeStack --require-approval never --context "wafAclArn=<the arn>" --context "mediaBaseUrl=https://<the distribution domain>"
+cdk deploy VibeStack --require-approval never
 ```
 
-The google client id is given the same way, with `--context "googleClientId=..."`.
-It is the client id of the google desktop app credential, the same one the
-flutter app uses.
+The google client id comes from the parameter store, so it is set once:
+
+```powershell
+aws ssm put-parameter --name /vibe/google-client-id --value "<the google client id>" --type String --overwrite
+```
 
 ## The free cdn plan
 
-The cloudfront flat rate plan is what keeps the cdn free, one plan covers one
-distribution and one web acl. It is done with the pricing plan manager, in
-us-east-1, once the distribution exists:
+The account is on the aws free plan, and the cloudfront flat rate plan is not
+available there:
 
-```powershell
-aws pricing-plan-manager create-subscription --plan-family CloudFront --plan-tier FREE --region us-east-1 --resource-arns <the distribution arn> <the web acl arn>
+```
+AWS Free Tier accounts can't create flat-rate pricing subscriptions.
+Upgrade to a paid account plan and try again.
 ```
 
-The free plan gives 1 million requests and 100 gb of transfer a month, there
-are no overage charges, and the aws origin traffic is free.
+So the distribution is on the pay as you go price, where the first 1 tb of
+transfer and 10 million requests a month are free, and the requests to the
+aws origin are free as well. The web acl (waf) is not used, it costs about 5
+dollars a month and would eat the credits of the account. The `EdgeStack` in
+`infra/cdk/edge_stack.py` is kept in the repository and comes back when the
+account is on the paid plan:
+
+```powershell
+# on the paid plan
+cdk deploy EdgeStack --require-approval never
+```
 
 ## The data move
 
 The old data is still in supabase and cloudinary. The scripts do the move, they
-read the old project and write the new one:
+read the old project and write the new one. They read the old database and the
+old supabase project from the `.env` file of the server folder:
 
 ```powershell
+# the old database, the connection string of the supabase project
+# DATABASE_URL=postgresql://<user>:<password>@<host>:5432/postgres
+# the old supabase project
+# SUPABASE_URL=https://<project>.supabase.co
+# SUPABASE_SERVICE_ROLE_KEY=<the service role key>
+
+python scripts/migrate_google_sub.py            # once, adds the google id to the old database
 python scripts/migrate_users_to_dynamodb.py     # the users, with their google ids
 python scripts/copy_media_to_s3.py              # the song files, it writes scripts/media_map.json
 python scripts/migrate_content_to_dynamodb.py   # the songs, the playlists and the favourites
 ```
-
-`scripts/migrate_google_sub.py` is only needed once, it adds the google id
-column to the old database and fills it from the supabase accounts.
 
 ## The checks
 
