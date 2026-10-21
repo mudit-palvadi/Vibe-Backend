@@ -50,44 +50,57 @@ def get_extension(url: str) -> str:
 
 DOWNLOAD_TIMEOUT = 60
 DOWNLOAD_ATTEMPTS = 20
+CHUNK_SIZE = 1024 * 1024
 READ_SIZE = 64 * 1024
 
 
 def download(url: str, target: Path) -> None:
-    """the files are big and the connection is slow, so the download keeps the
-    part it already has and continues from there the next time it is tried"""
+    """the files are big and the connection is slow, so the file is fetched in
+    small pieces and the part that is already there is kept for the next try"""
     part = target.with_name(target.name + ".part")
     part.parent.mkdir(parents=True, exist_ok=True)
+    total = None
 
     for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
-        have = part.stat().st_size if part.exists() else 0
         try:
-            request = urllib.request.Request(url, headers={"Range": f"bytes={have}-"})
-            with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT) as response:
-                if have and response.status != 206:
-                    # the server sent the whole file again, so the part we have is useless
-                    have = 0
-                    part.unlink(missing_ok=True)
+            while True:
+                have = part.stat().st_size if part.exists() else 0
+                if total is not None and have >= total:
+                    part.replace(target)
+                    return
 
-                length = response.headers.get("Content-Length")
-                total = int(length) + have if length else None
+                request = urllib.request.Request(
+                    url,
+                    headers={"Range": f"bytes={have}-{have + CHUNK_SIZE - 1}"},
+                )
+                with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT) as response:
+                    if have and response.status != 206:
+                        # the server sent the whole file again, so the part we have is useless
+                        part.unlink(missing_ok=True)
+                        have = 0
 
-                with part.open("ab") as handle:
-                    while True:
-                        chunk = response.read(READ_SIZE)
-                        if not chunk:
-                            break
-                        handle.write(chunk)
+                    # the range of the answer tells how big the whole file is
+                    content_range = response.headers.get("Content-Range")
+                    if content_range and "/" in content_range:
+                        total = int(content_range.split("/")[-1])
+                    else:
+                        length = response.headers.get("Content-Length")
+                        if length:
+                            total = int(length) + have
 
-            if total is None or part.stat().st_size >= total:
-                part.replace(target)
-                return
+                    with part.open("ab") as handle:
+                        while True:
+                            chunk = response.read(READ_SIZE)
+                            if not chunk:
+                                break
+                            handle.write(chunk)
 
-            print(f"the download of {url} stopped early, try {attempt} of {DOWNLOAD_ATTEMPTS}")
+                if part.stat().st_size == have:
+                    raise OSError("the server did not send any more data")
         except (TimeoutError, OSError) as error:
             print(f"the download of {url} failed ({error}), try {attempt} of {DOWNLOAD_ATTEMPTS}")
-
-        time.sleep(5)
+            time.sleep(5)
+            continue
 
     raise RuntimeError(f"the file could not be downloaded: {url}")
 
