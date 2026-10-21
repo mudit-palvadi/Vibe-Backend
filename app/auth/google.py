@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import httpx
 from fastapi import HTTPException
 
 from app.auth.jwks import verify_jwt
@@ -44,3 +45,29 @@ def verify_google_id_token(id_token: str) -> GoogleIdentity:
         name=payload.get("name") or email.split("@")[0],
         picture=payload.get("picture"),
     )
+
+
+def exchange_refresh_token(refresh_token: str) -> dict:
+    """trades the google refresh token of the client for a new google access token"""
+    data = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token",
+    }
+
+    if settings.GOOGLE_CLIENT_SECRET:
+        data["client_secret"] = settings.GOOGLE_CLIENT_SECRET
+
+    try:
+        response = httpx.post(settings.GOOGLE_TOKEN_URL, data=data, timeout=10)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail="Could not reach google") from e
+
+    if response.status_code == 200:
+        return response.json()
+
+    if response.status_code >= 500:
+        raise HTTPException(status_code=502, detail="Google is not answering right now")
+
+    # google says invalid_grant when the refresh token is not valid anymore
+    raise HTTPException(status_code=401, detail="Google session is not valid anymore")
