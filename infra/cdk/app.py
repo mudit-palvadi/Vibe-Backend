@@ -16,6 +16,7 @@ account = os.environ.get("CDK_DEFAULT_ACCOUNT")
 REGION = "ap-south-1"
 EDGE_REGION = "us-east-1"
 GOOGLE_CLIENT_ID_PARAMETER = "/vibe/google-client-id"
+GOOGLE_CLIENT_SECRET_PARAMETER = "/vibe/google-client-secret"
 
 
 def ensure_session_secret() -> None:
@@ -78,6 +79,8 @@ VibeStack(
     media_base_url=app.node.try_get_context("mediaBaseUrl") or find_api_url(),
     google_client_id=app.node.try_get_context("googleClientId")
     or read_parameter(GOOGLE_CLIENT_ID_PARAMETER),
+    google_client_secret=app.node.try_get_context("googleClientSecret")
+    or read_parameter(GOOGLE_CLIENT_SECRET_PARAMETER),
 )
 
 # the web acl is not deployed while the account is on the free plan, a

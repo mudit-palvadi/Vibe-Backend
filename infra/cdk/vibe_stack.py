@@ -44,6 +44,7 @@ class VibeStack(Stack):
         construct_id: str,
         media_base_url: str = "",
         google_client_id: str = "",
+        google_client_secret: str = "",
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -152,6 +153,7 @@ class VibeStack(Stack):
                 "MEDIA_BASE_URL": media_base_url,
                 "SESSION_SECRET_PARAMETER": SESSION_SECRET_PARAMETER,
                 "GOOGLE_CLIENT_ID": google_client_id,
+                "GOOGLE_CLIENT_SECRET": google_client_secret,
             },
         )
 
