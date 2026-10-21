@@ -5,10 +5,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
     # the old supabase project, only used by the keepalive and the migration scripts
     SUPABASE_URL: str = ""
-    CLOUDINARY_CLOUD_NAME: str = ""
-    CLOUDINARY_API_KEY: str = ""
-    CLOUDINARY_API_SECRET: str = ""
-
     # google oauth, the client id is checked against the id token audience
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
@@ -32,10 +28,6 @@ class Settings(BaseSettings):
     DB_BACKEND: str = "sqlmodel"
     DYNAMODB_TABLE_NAME: str = "vibe"
     AWS_REGION: str = "ap-south-1"
-
-    # the old cloudinary upload endpoint, it is turned off when the client
-    # uses the s3 upload
-    LEGACY_UPLOAD_ENABLED: bool = True
 
     # only needed by the one off scripts that read the old supabase data
     SUPABASE_SERVICE_ROLE_KEY: str = ""

@@ -1,42 +1,4 @@
-from sqlmodel import select
-
 from app.models.song import Song
-
-
-def test_upload_song(client, session, auth_headers, current_user, monkeypatch):
-    calls = []
-
-    def fake_upload(file, resource_type="auto", folder=None, **kwargs):
-        calls.append({"resource_type": resource_type, "folder": folder})
-        return {"url": f"https://res.cloudinary.com/test/{resource_type}/{folder}"}
-
-    monkeypatch.setattr("app.routes.song_routes.cloudinary.uploader.upload", fake_upload)
-
-    response = client.post(
-        "/song/upload",
-        headers=auth_headers,
-        data={"artist": "Test Artist", "song_name": "Test Song", "tags": "pop"},
-        files={
-            "song_audio": ("song.mp3", b"audio-bytes", "audio/mpeg"),
-            "thumbnail": ("thumb.jpg", b"image-bytes", "image/jpeg"),
-        },
-    )
-
-    assert response.status_code == 201
-    body = response.json()
-    assert body["message"] == "Song uploaded successfully"
-    assert body["song"]["song_name"] == "Test Song"
-    assert body["song"]["artist"] == "Test Artist"
-    assert body["song"]["tags"] == "pop"
-
-    song_id = body["song"]["id"]
-    assert calls[0]["folder"] == f"songs/{song_id}"
-    assert calls[1]["folder"] == f"songs/{song_id}"
-    assert calls[0]["resource_type"] == "auto"
-    assert calls[1]["resource_type"] == "image"
-
-    song = session.exec(select(Song).where(Song.id == song_id)).one()
-    assert song.song_url == body["song"]["song_url"]
 
 
 def test_fetch_songs(client, session, auth_headers, current_user):

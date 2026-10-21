@@ -1,8 +1,6 @@
 import uuid
 
-import cloudinary
-import cloudinary.uploader
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.config import settings
 from app.middleware.auth_middleware import get_current_user
@@ -13,7 +11,6 @@ from app.schemas.favourite import FavouriteSong
 from app.schemas.song import (
     FavouriteToggleResponse,
     SongResponse,
-    SongUploadResponse,
     UploadCompleteRequest,
     UploadCompleteResponse,
     UploadInitRequest,
@@ -31,56 +28,6 @@ from app.storage.s3 import (
 )
 
 router = APIRouter(prefix="/song", tags=["Upload Song"])
-
-cloudinary.config(
-    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-    api_key=settings.CLOUDINARY_API_KEY,
-    api_secret=settings.CLOUDINARY_API_SECRET,
-    secure=True,
-)
-
-
-@router.post("/upload", status_code=201, response_model=SongUploadResponse)
-def upload_song(
-    song_audio: UploadFile = File(...),
-    thumbnail: UploadFile = File(...),
-    artist: str = Form(...),
-    song_name: str = Form(...),
-    tags: str = Form(...),
-    songs: SongRepository = Depends(get_song_repository),
-    auth_user: UserRecord = Depends(get_current_user),
-):
-    if not settings.LEGACY_UPLOAD_ENABLED:
-        raise HTTPException(status_code=404, detail="The old upload endpoint is turned off")
-
-    song_id = str(uuid.uuid4())
-    song_upload_response = cloudinary.uploader.upload(
-        song_audio.file, resource_type="auto", folder=f"songs/{song_id}"
-    )
-    thumbnail_upload_response = cloudinary.uploader.upload(
-        thumbnail.file, resource_type="image", folder=f"songs/{song_id}"
-    )
-
-    new_song = songs.create(
-        song_id=song_id,
-        song_name=song_name,
-        artist=artist,
-        tags=tags,
-        song_url=song_upload_response["url"],
-        thumbnail_url=thumbnail_upload_response["url"],
-    )
-
-    return {
-        "message": "Song uploaded successfully",
-        "song": {
-            "id": new_song.id,
-            "song_name": new_song.song_name,
-            "artist": new_song.artist,
-            "song_url": new_song.song_url,
-            "thumbnail_url": new_song.thumbnail_url,
-            "tags": new_song.tags,
-        },
-    }
 
 
 @router.post("/upload-init", status_code=201, response_model=UploadInitResponse)
