@@ -10,8 +10,19 @@ from app.repositories.dependencies import get_favourite_repository, get_song_rep
 from app.repositories.protocols import FavouriteRepository, SongRepository
 from app.repositories.records import UserRecord
 from app.schemas.favourite import FavouriteSong
-from app.schemas.song import FavouriteToggleResponse, SongResponse, SongUploadResponse
+from app.schemas.song import (
+    FavouriteToggleResponse,
+    SongResponse,
+    SongUploadResponse,
+    UploadInitRequest,
+    UploadInitResponse,
+)
 from app.schemas.user import FavouriteResponse
+from app.storage.s3 import (
+    build_temp_key,
+    create_upload_url,
+    guess_content_type,
+)
 
 router = APIRouter(prefix="/song", tags=["Upload Song"])
 
@@ -60,6 +71,27 @@ def upload_song(
             "thumbnail_url": new_song.thumbnail_url,
             "tags": new_song.tags,
         },
+    }
+
+
+@router.post("/upload-init", status_code=201, response_model=UploadInitResponse)
+def upload_init(
+    request: UploadInitRequest,
+    auth_user: UserRecord = Depends(get_current_user),
+):
+    song_id = str(uuid.uuid4())
+
+    return {
+        "song_id": song_id,
+        "audio": create_upload_url(
+            build_temp_key(song_id, request.audio_filename, "audio"),
+            guess_content_type(request.audio_filename),
+        ),
+        "thumbnail": create_upload_url(
+            build_temp_key(song_id, request.thumbnail_filename, "thumbnail"),
+            guess_content_type(request.thumbnail_filename),
+        ),
+        "expires_in": settings.S3_UPLOAD_URL_EXPIRY,
     }
 
 
