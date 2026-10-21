@@ -10,6 +10,7 @@ run it once:
 import json
 import os
 import sys
+import time
 import urllib.request
 from io import BytesIO
 from urllib.parse import urlparse
@@ -46,9 +47,24 @@ def get_extension(url: str) -> str:
     return os.path.splitext(urlparse(url).path)[1].lower()
 
 
+DOWNLOAD_TIMEOUT = 600
+DOWNLOAD_ATTEMPTS = 4
+
+
 def download(url: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=60) as response:
-        return response.read()
+    """the files are big and the connection is slow, so it tries a few times"""
+    last_error = None
+
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as response:
+                return response.read()
+        except (TimeoutError, OSError) as error:
+            last_error = error
+            print(f"the download of {url} failed ({error}), try {attempt} of {DOWNLOAD_ATTEMPTS}")
+            time.sleep(5)
+
+    raise RuntimeError(f"the file could not be downloaded: {url}") from last_error
 
 
 def upload(client, bucket: str, key: str, url: str) -> None:
@@ -59,6 +75,15 @@ def upload(client, bucket: str, key: str, url: str) -> None:
         key,
         ExtraArgs={"ContentType": guess_content_type(key)},
     )
+
+
+def already_there(client, bucket: str, key: str) -> bool:
+    """a file that is already in the bucket is not downloaded again"""
+    try:
+        client.head_object(Bucket=bucket, Key=key)
+        return True
+    except client.exceptions.ClientError:
+        return False
 
 
 def main() -> None:
@@ -72,18 +97,31 @@ def main() -> None:
     client = boto3.client("s3", region_name=settings.S3_REGION)
     media_map = {}
 
+    if os.path.exists(MEDIA_MAP_PATH):
+        with open(MEDIA_MAP_PATH, encoding="utf-8") as file:
+            media_map = json.load(file)
+
     for song in songs:
         song_id = song["id"]
         audio_key = f"{FINAL_PREFIX}/{song_id}/audio{get_extension(song['song_url'])}"
         thumbnail_key = f"{FINAL_PREFIX}/{song_id}/thumbnail{get_extension(song['thumbnail_url'])}"
 
-        upload(client, settings.S3_BUCKET, audio_key, song["song_url"])
-        upload(client, settings.S3_BUCKET, thumbnail_key, song["thumbnail_url"])
+        for key, url in ((audio_key, song["song_url"]), (thumbnail_key, song["thumbnail_url"])):
+            if already_there(client, settings.S3_BUCKET, key):
+                print(f"the file {key} is already in the bucket")
+                continue
+
+            upload(client, settings.S3_BUCKET, key, url)
 
         media_map[song_id] = {
             "song_url": media_url(audio_key),
             "thumbnail_url": media_url(thumbnail_key),
         }
+
+        # the map is written after every song, so a broken connection does not lose the work
+        with open(MEDIA_MAP_PATH, "w", encoding="utf-8") as file:
+            json.dump(media_map, file, indent=2)
+
         print(f"copied the files of the song {song_id}")
 
     with open(MEDIA_MAP_PATH, "w", encoding="utf-8") as file:
