@@ -18,9 +18,11 @@ class VibeStack(Stack):
             partition_key=ddb.Attribute(name="PK", type=ddb.AttributeType.STRING),
             sort_key=ddb.Attribute(name="SK", type=ddb.AttributeType.STRING),
             billing_mode=ddb.BillingMode.PROVISIONED,
-            read_capacity_units=15,
-            write_capacity_units=15,
-            point_in_time_recovery=False,
+            read_capacity=15,
+            write_capacity=15,
+            point_in_time_recovery_specification=ddb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=False,
+            ),
             removal_policy=RemovalPolicy.DESTROY,
         )
 
