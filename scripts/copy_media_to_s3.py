@@ -10,9 +10,10 @@ run it once:
 import json
 import os
 import sys
+import tempfile
 import time
 import urllib.request
-from io import BytesIO
+from pathlib import Path
 from urllib.parse import urlparse
 
 import boto3
@@ -47,34 +48,60 @@ def get_extension(url: str) -> str:
     return os.path.splitext(urlparse(url).path)[1].lower()
 
 
-DOWNLOAD_TIMEOUT = 600
-DOWNLOAD_ATTEMPTS = 4
+DOWNLOAD_TIMEOUT = 60
+DOWNLOAD_ATTEMPTS = 20
+READ_SIZE = 64 * 1024
 
 
-def download(url: str) -> bytes:
-    """the files are big and the connection is slow, so it tries a few times"""
-    last_error = None
+def download(url: str, target: Path) -> None:
+    """the files are big and the connection is slow, so the download keeps the
+    part it already has and continues from there the next time it is tried"""
+    part = target.with_name(target.name + ".part")
+    part.parent.mkdir(parents=True, exist_ok=True)
 
     for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        have = part.stat().st_size if part.exists() else 0
         try:
-            with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as response:
-                return response.read()
-        except (TimeoutError, OSError) as error:
-            last_error = error
-            print(f"the download of {url} failed ({error}), try {attempt} of {DOWNLOAD_ATTEMPTS}")
-            time.sleep(5)
+            request = urllib.request.Request(url, headers={"Range": f"bytes={have}-"})
+            with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT) as response:
+                if have and response.status != 206:
+                    # the server sent the whole file again, so the part we have is useless
+                    have = 0
+                    part.unlink(missing_ok=True)
 
-    raise RuntimeError(f"the file could not be downloaded: {url}") from last_error
+                length = response.headers.get("Content-Length")
+                total = int(length) + have if length else None
+
+                with part.open("ab") as handle:
+                    while True:
+                        chunk = response.read(READ_SIZE)
+                        if not chunk:
+                            break
+                        handle.write(chunk)
+
+            if total is None or part.stat().st_size >= total:
+                part.replace(target)
+                return
+
+            print(f"the download of {url} stopped early, try {attempt} of {DOWNLOAD_ATTEMPTS}")
+        except (TimeoutError, OSError) as error:
+            print(f"the download of {url} failed ({error}), try {attempt} of {DOWNLOAD_ATTEMPTS}")
+
+        time.sleep(5)
+
+    raise RuntimeError(f"the file could not be downloaded: {url}")
 
 
 def upload(client, bucket: str, key: str, url: str) -> None:
-    body = download(url)
-    client.upload_fileobj(
-        BytesIO(body),
+    target = Path(tempfile.gettempdir()) / "vibe_media" / key.replace("/", "_")
+    download(url, target)
+    client.upload_file(
+        str(target),
         bucket,
         key,
         ExtraArgs={"ContentType": guess_content_type(key)},
     )
+    target.unlink(missing_ok=True)
 
 
 def already_there(client, bucket: str, key: str) -> bool:
@@ -106,12 +133,23 @@ def main() -> None:
         audio_key = f"{FINAL_PREFIX}/{song_id}/audio{get_extension(song['song_url'])}"
         thumbnail_key = f"{FINAL_PREFIX}/{song_id}/thumbnail{get_extension(song['thumbnail_url'])}"
 
+        failed = False
+
         for key, url in ((audio_key, song["song_url"]), (thumbnail_key, song["thumbnail_url"])):
             if already_there(client, settings.S3_BUCKET, key):
                 print(f"the file {key} is already in the bucket")
                 continue
 
-            upload(client, settings.S3_BUCKET, key, url)
+            try:
+                upload(client, settings.S3_BUCKET, key, url)
+            except RuntimeError as error:
+                # the song is skipped, the other songs still get copied
+                print(f"the song {song_id} was skipped ({error})")
+                failed = True
+                break
+
+        if failed:
+            continue
 
         media_map[song_id] = {
             "song_url": media_url(audio_key),
