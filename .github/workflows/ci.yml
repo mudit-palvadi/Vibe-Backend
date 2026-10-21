@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: install the packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: the lint
+        run: ruff check .
+
+      - name: the format
+        run: ruff format --check .
+
+      - name: the tests
+        run: pytest

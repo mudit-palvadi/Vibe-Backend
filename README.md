@@ -102,7 +102,7 @@ server/
 | :----- | :--------------- | :-------------: | :----------------------------------------------------------------------- |
 | `POST` | `/auth/login`    |       No        | Takes the Google id token and returns a session token.                    |
 | `POST` | `/auth/refresh`  |       Yes       | Renews the session token with the Google refresh token of the client.     |
-| `GET`  | `/auth/`         |       Yes       | Returns the logged-in user profile with their favorite songs.             |
+| `GET`  | `/auth`          |       Yes       | Returns the logged-in user profile with their favorite songs.             |
 
 ### Song Endpoints
 
@@ -291,8 +291,15 @@ pytest
 
 ### Live Hosted API & Docs
 
-The backend is publicly hosted and running on Oracle Cloud. You can connect to the API or browse the documentation directly using these links:
-* **Live Swagger UI**: [http://152.67.191.54:8000/docs](http://152.67.191.54:8000/docs)
-* **Live ReDoc view**: [http://152.67.191.54:8000/redoc](http://152.67.191.54:8000/redoc)
+The backend runs on AWS behind CloudFront. The links below open the api that the app uses:
+* **Base url**: [https://d3hb9a4bci0gq5.cloudfront.net](https://d3hb9a4bci0gq5.cloudfront.net)
+* **Swagger UI**: [https://d3hb9a4bci0gq5.cloudfront.net/docs](https://d3hb9a4bci0gq5.cloudfront.net/docs)
+* **ReDoc view**: [https://d3hb9a4bci0gq5.cloudfront.net/redoc](https://d3hb9a4bci0gq5.cloudfront.net/redoc)
+
+Two headers matter when the api is called through CloudFront:
+* the session token goes in the **`x-vibe-auth`** header, CloudFront signs the request it sends to the lambda and the `Authorization` header of the caller is replaced by that signature
+* a request that has a body needs **`x-amz-content-sha256`** with the sha256 hash of the body, the same signing needs it to check the body it forwards
+
+The old api on the Oracle Cloud machine is still up, it is only used until the data has moved over.
 
 ---
