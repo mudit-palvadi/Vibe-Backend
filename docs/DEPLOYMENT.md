@@ -13,6 +13,7 @@ there is no server to keep alive, only the aws resources.
 | the cdn (cloudfront) | `VibeStack` | global |
 | the session secret | ssm parameter `/vibe/session-secret` | ap-south-1 |
 | the google client id | ssm parameter `/vibe/google-client-id` | ap-south-1 |
+| the google client secret | ssm parameter `/vibe/google-client-secret` | ap-south-1 |
 
 Everything lives in ap-south-1. The web acl (waf) is not used while the
 account is on the free plan, it costs about 5 dollars a month, see the free
@@ -67,10 +68,11 @@ domain up in the stack outputs, so the second deploy fills it in:
 cdk deploy VibeStack --require-approval never
 ```
 
-The google client id comes from the parameter store, so it is set once:
+The google client id and secret come from the parameter store, so they are set once:
 
 ```powershell
 aws ssm put-parameter --name /vibe/google-client-id --value "<the google client id>" --type String --overwrite
+aws ssm put-parameter --name /vibe/google-client-secret --value "<the google client secret>" --type String --overwrite
 ```
 
 ## The free cdn plan

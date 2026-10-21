@@ -225,7 +225,7 @@ The users sign in with their Google account, there is no password and no user da
 3. Go to **OAuth consent screen** first. Pick the **Testing** type and add the Google account of the people that use the app as **test users**, a testing app only lets those accounts sign in.
 4. Go to **Credentials** and press **Create credentials** and then **OAuth client ID**.
 5. Pick the application type **Web application** and give it a name. The Flutter package that does the sign in opens the system browser and comes back to `http://localhost:8000`, so that address has to be the **Authorized redirect URI** of the client. The secret of a web client is not a real secret, the app is a public client on the desktop.
-6. Put the client id and the client secret in the `.env` file of the server as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and in the `.env` file of the Flutter app as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The server also reads `GOOGLE_CLIENT_ID` from the parameter store `/vibe/google-client-id`, so the lambda always has the right one after a deploy.
+6. Put the client id and the client secret in the `.env` file of the server as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and in the `.env` file of the Flutter app as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The server also reads `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from the parameter store (`/vibe/google-client-id` and `/vibe/google-client-secret`), so the lambda always has the right ones after a deploy.
 
 The sign in on the client side works like this:
 
