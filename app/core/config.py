@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     MEDIA_BASE_URL: str = ""
     S3_UPLOAD_URL_EXPIRY: int = 900
 
+    # which database the app talks to, sqlmodel or dynamodb
+    DB_BACKEND: str = "sqlmodel"
+    DYNAMODB_TABLE_NAME: str = "vibe"
+    AWS_REGION: str = "ap-south-1"
+
     # the old cloudinary upload endpoint, it is turned off when the client
     # uses the s3 upload
     LEGACY_UPLOAD_ENABLED: bool = True

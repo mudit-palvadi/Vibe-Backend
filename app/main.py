@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlmodel import SQLModel
 
+from app.core.config import settings
 from app.db.database import engine
 from app.routes.auth_routes import router as auth_router
 from app.routes.playlist_routes import router as playlist_router
@@ -11,8 +12,11 @@ from app.routes.song_routes import router as song_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    SQLModel.metadata.create_all(engine)
-    print("Database connected")
+    if settings.DB_BACKEND == "dynamodb":
+        print("Dynamodb connected")
+    else:
+        SQLModel.metadata.create_all(engine)
+        print("Database connected")
     yield
     print("Application shutdown")
 
