@@ -4,6 +4,7 @@ import jwt
 from fastapi import HTTPException
 
 from app.core.config import settings
+from app.core.secrets import session_secret
 
 
 def create_session_token(
@@ -23,7 +24,7 @@ def create_session_token(
         "exp": int(expires_at.timestamp()),
     }
 
-    token = jwt.encode(payload, settings.SESSION_SECRET, algorithm="HS256")
+    token = jwt.encode(payload, session_secret(), algorithm="HS256")
 
     return token, int((expires_at - now).total_seconds())
 
@@ -33,7 +34,7 @@ def verify_session_token(token: str) -> dict:
     try:
         return jwt.decode(
             token,
-            settings.SESSION_SECRET,
+            session_secret(),
             algorithms=["HS256"],
             issuer=settings.SESSION_ISSUER,
         )

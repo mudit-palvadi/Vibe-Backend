@@ -1,4 +1,3 @@
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,7 +17,8 @@ class Settings(BaseSettings):
     GOOGLE_ISSUER: str = "https://accounts.google.com"
 
     # the session token we sign ourselves after the google login
-    SESSION_SECRET: str = Field(min_length=32)
+    SESSION_SECRET: str = ""
+    SESSION_SECRET_PARAMETER: str = ""
     SESSION_TTL_DAYS: int = 30
     SESSION_ISSUER: str = "vibe-backend"
 
