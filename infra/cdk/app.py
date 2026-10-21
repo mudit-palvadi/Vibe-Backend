@@ -82,7 +82,7 @@ def find_api_url() -> str:
 
     for output in stacks[0].get("Outputs", []):
         if output["OutputKey"] == "ApiUrl":
-            return output["OutputValue"].replace("https://", "").rstrip("/")
+            return output["OutputValue"].rstrip("/")
 
     return ""
 
