@@ -50,6 +50,9 @@ def upload_song(
     songs: SongRepository = Depends(get_song_repository),
     auth_user: UserRecord = Depends(get_current_user),
 ):
+    if not settings.LEGACY_UPLOAD_ENABLED:
+        raise HTTPException(status_code=404, detail="The old upload endpoint is turned off")
+
     song_id = str(uuid.uuid4())
     song_upload_response = cloudinary.uploader.upload(
         song_audio.file, resource_type="auto", folder=f"songs/{song_id}"
