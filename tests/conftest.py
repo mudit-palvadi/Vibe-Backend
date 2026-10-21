@@ -57,16 +57,18 @@ def session(db):
 def token_payload():
     return {
         "sub": TEST_SUB,
+        "google_sub": "google-sub-1",
         "email": TEST_EMAIL,
-        "user_metadata": {"full_name": "Test User"},
+        "name": "Test User",
     }
 
 
 @pytest.fixture(autouse=True)
-def mock_verify_token(token_payload, monkeypatch):
-    """The google/supabase tokens are not verified in the tests."""
+def mock_verify_session_token(token_payload, monkeypatch):
+    """The session tokens are not signed in the tests."""
     monkeypatch.setattr(
-        "app.middleware.auth_middleware.verify_token", lambda token: dict(token_payload)
+        "app.middleware.auth_middleware.verify_session_token",
+        lambda token: dict(token_payload),
     )
     return token_payload
 

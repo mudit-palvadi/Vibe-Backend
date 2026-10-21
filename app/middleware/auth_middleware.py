@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session, select
 
-from app.auth.jwt_handler import verify_token
+from app.auth.session import verify_session_token
 from app.db.database import get_session
 from app.models.user import User
 
@@ -21,36 +21,26 @@ def get_current_user(
             detail="Invalid authorization format or token missing",
         )
 
-    token = credentials.credentials
-    payload = verify_token(token)
+    payload = verify_session_token(credentials.credentials)
 
-    sub = payload.get("sub")
-    email = payload.get("email")
-    name = payload.get("user_metadata", {}).get("full_name", "User")
+    user_id = payload.get("sub")
+    google_sub = payload.get("google_sub")
 
-    if not sub or not email:
-        raise HTTPException(status_code=401, detail="Invalid token payload")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid session token payload")
 
     try:
-        user_uuid = UUID(sub)
+        user_uuid = UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid user ID format") from None
 
-    # Ensure user exists in db and has correct UUID
     user = db.exec(select(User).where(User.id == user_uuid)).first()
+
+    if not user and google_sub:
+        # the user is also found by the google id, so an old session still works
+        user = db.exec(select(User).where(User.google_sub == google_sub)).first()
+
     if not user:
-        user_by_email = db.exec(select(User).where(User.email == email)).first()
-        if user_by_email:
-            user_by_email.id = user_uuid
-            db.add(user_by_email)
-            db.commit()
-            db.refresh(user_by_email)
-            user = user_by_email
-        else:
-            new_user = User(id=user_uuid, name=name, email=email)
-            db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
-            user = new_user
+        raise HTTPException(status_code=404, detail="User not found!")
 
     return user
