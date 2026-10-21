@@ -15,6 +15,9 @@ class User(SQLModel, table=True):
 
     email: str = Field(unique=True, index=True)
 
+    # the id of the google account, this is what we log in with now
+    google_sub: str | None = Field(default=None, unique=True, index=True)
+
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
