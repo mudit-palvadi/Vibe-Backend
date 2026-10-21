@@ -30,9 +30,7 @@ def test_the_middleware_rejects_a_session_token_it_cannot_check(client, monkeypa
     def broken_verify(token):
         raise HTTPException(status_code=401, detail="Invalid session token")
 
-    monkeypatch.setattr(
-        "app.middleware.auth_middleware.verify_session_token", broken_verify
-    )
+    monkeypatch.setattr("app.middleware.auth_middleware.verify_session_token", broken_verify)
 
     response = client.get("/auth/", headers={"Authorization": "Bearer broken-token"})
 

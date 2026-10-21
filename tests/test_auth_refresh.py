@@ -69,9 +69,7 @@ def test_refresh_needs_a_session_token(client, current_user):
 
 
 def test_refresh_needs_a_refresh_token(client, current_user):
-    response = client.post(
-        "/auth/refresh", json={}, headers={"Authorization": "Bearer test-token"}
-    )
+    response = client.post("/auth/refresh", json={}, headers={"Authorization": "Bearer test-token"})
 
     assert response.status_code == 422
 
